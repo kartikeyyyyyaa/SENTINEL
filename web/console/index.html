@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sentinel Operator Console</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <header id="topbar">
+      <div class="brand">
+        <span class="brand-mark">&#9673;</span>
+        <span class="brand-name">SENTINEL</span>
+        <span class="brand-sub">Operator Console</span>
+      </div>
+
+      <div class="topbar-stats" id="topbar-stats">
+        <div class="stat"><span class="stat-value" id="stat-cameras">&mdash;</span><span class="stat-label">cameras</span></div>
+        <div class="stat"><span class="stat-value" id="stat-online">&mdash;</span><span class="stat-label">online</span></div>
+        <div class="stat"><span class="stat-value" id="stat-tracks">&mdash;</span><span class="stat-label">active tracks</span></div>
+        <div class="stat"><span class="stat-value" id="stat-alerts">&mdash;</span><span class="stat-label">open alerts</span></div>
+      </div>
+
+      <div class="topbar-right">
+        <button id="safety-toggle" class="toggle-safety" type="button" title="Highlight isolated/high-risk zones and surface women's-safety alerts first">
+          <span class="switch"></span><span>Women&rsquo;s Safety Mode</span>
+        </button>
+        <button id="sos-btn" class="btn-sos" type="button" title="Report a women's-safety SOS (see api/routers/alerts.py — no login required for a real one)">SOS</button>
+        <span id="data-mode" class="badge badge-demo" title="Where camera and event data is coming from"><span class="badge-dot"></span>DEMO DATA</span>
+        <span class="clock" id="clock">--:--:--</span>
+        <button id="user-chip" class="user-chip" type="button" hidden>
+          <span class="avatar" id="user-avatar">&mdash;</span>
+          <span id="user-name">&mdash;</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="layout">
+
+      <aside id="sidebar">
+        <div class="panel-head">
+          <h2>Cameras</h2>
+          <input id="camera-search" type="search" placeholder="Search code, name, ward&hellip;" autocomplete="off">
+        </div>
+        <div class="filter-row" id="status-filters">
+          <button class="chip chip-active" data-status="all">All</button>
+          <button class="chip" data-status="active">Active</button>
+          <button class="chip" data-status="faulty">Faulty</button>
+          <button class="chip" data-status="maintenance">Maint.</button>
+          <button class="chip" data-status="inactive">Offline</button>
+        </div>
+        <ul id="camera-list" class="camera-list"></ul>
+      </aside>
+
+      <main id="map-wrap">
+        <div id="map"></div>
+        <div id="radar-sweep"></div>
+        <div id="map-toast"></div>
+        <div id="map-legend">
+          <div class="legend-row"><span class="dot dot-active"></span>active</div>
+          <div class="legend-row"><span class="dot dot-faulty"></span>faulty</div>
+          <div class="legend-row"><span class="dot dot-maintenance"></span>maintenance</div>
+          <div class="legend-row"><span class="dot dot-inactive"></span>offline</div>
+        </div>
+      </main>
+
+      <aside id="side-panel">
+        <div class="tabs" id="panel-tabs">
+          <button class="tab tab-active" data-tab="alerts">Alerts <span id="alerts-count" class="tab-count">0</span></button>
+          <button class="tab" data-tab="watchlist">Watchlist</button>
+          <button class="tab" data-tab="events">Live Events</button>
+        </div>
+
+        <div id="tab-alerts" class="tab-body tab-body-active">
+          <ul id="alerts-list" class="feed-list"></ul>
+        </div>
+
+        <div id="tab-watchlist" class="tab-body">
+          <div class="wl-search">
+            <input id="wl-search-input" type="search" placeholder="Plate, name or case ref&hellip;" autocomplete="off">
+            <button id="wl-search-btn" type="button">Search</button>
+          </div>
+          <ul id="wl-list" class="wl-list"></ul>
+        </div>
+
+        <div id="tab-events" class="tab-body">
+          <ul id="events-list" class="feed-list"></ul>
+        </div>
+      </aside>
+
+    </div>
+
+    <footer id="statusbar">
+      <span id="footer-note">Metadata only &mdash; no video crosses this console. See services/analytics for the edge pipeline that produces these events.</span>
+    </footer>
+
+  </div>
+
+  <div id="camera-detail" class="drawer" hidden>
+    <div class="drawer-head">
+      <h3 id="cd-title">&mdash;</h3>
+      <button id="cd-close" class="icon-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="drawer-body" id="cd-body"></div>
+  </div>
+
+  <div id="login-overlay">
+    <div class="login-card">
+      <div class="login-brand"><span class="brand-mark">&#9673;</span><span class="brand-name">SENTINEL</span></div>
+      <div class="login-sub">Sign in to the operator console</div>
+      <form id="login-form">
+        <div class="login-field">
+          <label for="login-username">Username</label>
+          <input id="login-username" type="text" autocomplete="username" required>
+        </div>
+        <div class="login-field">
+          <label for="login-password">Password</label>
+          <input id="login-password" type="password" autocomplete="current-password" required>
+        </div>
+        <button id="login-submit" class="login-submit" type="submit">Sign in</button>
+        <div id="login-error" class="login-error"></div>
+      </form>
+      <a id="login-demo" class="login-demo">Continue without signing in &mdash; demo data only &rarr;</a>
+    </div>
+  </div>
+
+  <div id="sos-modal" class="modal-backdrop" hidden>
+    <div class="modal-card">
+      <h3>Report SOS</h3>
+      <p>This sends a real, unauthenticated panic signal to <code>POST /api/sos</code> &mdash; exactly what a kiosk or the mobile app would send. It opens a critical alert immediately, with no login required. Use this to demo the women&rsquo;s-safety response path.</p>
+      <div class="modal-actions">
+        <button id="sos-cancel" class="modal-cancel" type="button">Cancel</button>
+        <button id="sos-confirm" class="modal-confirm" type="button">Send SOS</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
