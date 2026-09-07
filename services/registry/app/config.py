@@ -58,6 +58,22 @@ class Settings(BaseSettings):
     sandbox_base_url: str = Field(default="", alias="SANDBOX_BASE_URL")
     sandbox_sync_enabled: bool = Field(default=False, alias="SANDBOX_SYNC_ENABLED")
 
+    # -- Government camera grid (the hackathon sandbox) -----------------------
+    # The catalogue the onboarding tool reads (id + name only — locations are
+    # supplied from a local overlay). RTSP/WHEP media is served directly on the
+    # grid's public IP, not the CDN, so the stream host is separate from the
+    # catalogue host. Credentials are the participant's own registered email +
+    # access password; they are read here (not stored in the DB) and embedded in
+    # the per-camera RTSP URL that /api/analytics/assignments hands to an
+    # authenticated edge worker. Left blank, assignments return no URL and the
+    # worker runs those cameras as stubs — which is the correct behaviour on a
+    # network where the grid ports are blocked (see docs: hostel/public network).
+    grid_catalogue_url: str = Field(default="https://cctv.corp8.cloud/cameras.json", alias="GRID_CATALOGUE_URL")
+    grid_stream_host: str = Field(default="103.250.160.189", alias="GRID_STREAM_HOST")
+    grid_rtsp_port: int = Field(default=8554, alias="GRID_RTSP_PORT")
+    grid_email: str = Field(default="", alias="GRID_EMAIL")
+    grid_password: str = Field(default="", alias="GRID_PASSWORD")
+
     @field_validator("credential_master_key")
     @classmethod
     def _validate_master_key(cls, v: str) -> str:

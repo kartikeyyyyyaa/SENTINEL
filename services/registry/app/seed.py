@@ -122,13 +122,20 @@ def run() -> None:
         # Two demo watchlist entries: one vehicle, one person-by-embedding
         # (a deterministic stub vector — see services/analytics/stages/face.py
         # — not a real enrolled face, so this is safe to ship in a public repo).
+        # Idempotent by case_reference: watchlist_entry has no unique constraint
+        # on plate_number (the same plate can legitimately be listed more than
+        # once over time), so a bare ON CONFLICT catches nothing and re-seeding
+        # would duplicate these demo rows. Guard on the demo case reference with
+        # WHERE NOT EXISTS so re-running seed is genuinely idempotent.
         cur.execute(
             """
             INSERT INTO app.watchlist_entry (entry_type, risk_level, plate_number, label,
                                               case_reference, jurisdiction_id, source)
-            VALUES ('stolen_vehicle', 'critical', 'GJ01AB1234',
-                    '2019 white Maruti Swift, reported stolen', 'FIR-AHM-2026-00417', %s, 'manual')
-            ON CONFLICT DO NOTHING
+            SELECT 'stolen_vehicle', 'critical', 'GJ01AB1234',
+                   '2019 white Maruti Swift, reported stolen', 'FIR-AHM-2026-00417', %s, 'manual'
+            WHERE NOT EXISTS (
+                SELECT 1 FROM app.watchlist_entry WHERE case_reference = 'FIR-AHM-2026-00417'
+            )
             """,
             (ahm,),
         )
@@ -136,9 +143,11 @@ def run() -> None:
             """
             INSERT INTO app.watchlist_entry (entry_type, risk_level, label, case_reference,
                                               jurisdiction_id, source)
-            VALUES ('missing_person', 'high', 'Demo missing-person entry (no photo stored)',
-                    'MP-AHM-2026-00092', %s, 'manual')
-            ON CONFLICT DO NOTHING
+            SELECT 'missing_person', 'high', 'Demo missing-person entry (no photo stored)',
+                   'MP-AHM-2026-00092', %s, 'manual'
+            WHERE NOT EXISTS (
+                SELECT 1 FROM app.watchlist_entry WHERE case_reference = 'MP-AHM-2026-00092'
+            )
             """,
             (ahm,),
         )

@@ -136,42 +136,55 @@
   }
 
   // ---------------------------------------------------------------------
-  // Demo camera fixture
+  // Demo camera fixture — the REAL government grid (cctv.corp8.cloud)
   // ---------------------------------------------------------------------
-  // Shaped after app.camera in db/migrations/002_camera.sql: code, name,
-  // camera_type, status, location, bearing/fov/range wedge, department and
-  // jurisdiction. Coordinates are real Ahmedabad locations; the cameras
-  // themselves are fictional.
+  // These are the 30 live cameras from the hackathon grid's cameras.json,
+  // with the same locations the registry onboarding uses
+  // (services/registry/app/fixtures/gov_camera_locations.json). Using them as
+  // the demo fixture means the Gujarat satellite map is populated with the real
+  // grid even before an operator signs in; once signed in, the identical set is
+  // served live from the registry. Coordinates marked "verify" in the overlay
+  // are best-estimate and can be corrected there.
 
   const DEMO_CAMERAS = [
-    cam(1, "AHM-NAV-0142", "Navrangpura Cross, Approach Rd", "anpr", "active",
-      23.0339, 72.5622, 40, 90, 120, "Ahmedabad Traffic Police", "GJ.AHM.NAVRANGPURA", false),
-    cam(2, "AHM-NAV-0143", "Navrangpura Cross, Exit Rd", "anpr", "active",
-      23.0341, 72.5628, 220, 90, 120, "Ahmedabad Traffic Police", "GJ.AHM.NAVRANGPURA", false),
-    cam(3, "AHM-ELS-0021", "Ellis Bridge, River Front", "ptz", "active",
-      23.0258, 72.5714, 0, 360, 80, "Ahmedabad Municipal Corporation", "GJ.AHM.KHANPUR", true),
-    cam(4, "AHM-CGR-0087", "CG Road, Panchvati Junction", "fixed", "faulty",
-      23.0195, 72.5561, 300, 100, 90, "Ahmedabad Traffic Police", "GJ.AHM.NAVRANGPURA", false),
-    cam(5, "AHM-MAN-0009", "Manek Chowk, East Gate", "dome", "active",
-      23.0246, 72.5891, 150, 360, 60, "Ahmedabad Municipal Corporation", "GJ.AHM.KALUPUR", false),
-    cam(6, "AHM-SGH-0055", "SG Highway, Iskcon Overbridge", "anpr", "active",
-      23.0284, 72.5069, 45, 80, 150, "Ahmedabad Traffic Police", "GJ.AHM.BODAKDEV", false),
-    cam(7, "AHM-SGH-0056", "SG Highway, Iskcon Underpass", "bullet", "maintenance",
-      23.0281, 72.5075, 225, 80, 150, "Ahmedabad Traffic Police", "GJ.AHM.BODAKDEV", false),
-    cam(8, "AHM-VAS-0033", "Vastrapur Lake, North Path", "fixed", "active",
-      23.0368, 72.5290, 90, 120, 70, "Ahmedabad Municipal Corporation", "GJ.AHM.VASTRAPUR", true),
-    cam(9, "AHM-RLY-0004", "Kalupur Railway Station, Gate 2", "thermal", "inactive",
-      23.0272, 72.6013, 0, 360, 50, "Western Railway", "GJ.AHM.KALUPUR", false),
-    cam(10, "AHM-JUH-0018", "Juhapura Ring Road", "fixed", "active",
-      22.9878, 72.5432, 10, 100, 100, "Ahmedabad Traffic Police", "GJ.AHM.JUHAPURA", false),
+    cam(1, "GRID-CAM01", "01 Chiman bhai Bridge", "fixed", "active", 23.0060, 72.5730, "Ahmedabad"),
+    cam(2, "GRID-CAM02", "02 Janpath", "fixed", "active", 23.0370, 72.5670, "Ahmedabad"),
+    cam(3, "GRID-CAM03", "03 O.N.G.C. Office", "fixed", "active", 23.1010, 72.5810, "Ahmedabad"),
+    cam(4, "GRID-CAM04", "04 Paldi Circle", "anpr", "active", 23.0100, 72.5670, "Ahmedabad"),
+    cam(5, "GRID-CAM05", "05 Visat teen Rasta", "anpr", "active", 23.1080, 72.5900, "Ahmedabad"),
+    cam(6, "GRID-CAM06", "06 Timbavadi gate-Junagadh", "fixed", "active", 21.5050, 70.4680, "Junagadh"),
+    cam(7, "GRID-CAM07", "07 hero-showroom-gir-somnath", "fixed", "active", 20.9000, 70.3700, "Gir Somnath"),
+    cam(8, "GRID-CAM08", "08 majewadi-gate-junagadh", "fixed", "active", 21.5170, 70.4570, "Junagadh"),
+    cam(9, "GRID-CAM09", "09 new-bypass-near-by-circle-junagadh-2", "fixed", "active", 21.5200, 70.4400, "Junagadh"),
+    cam(10, "GRID-CAM10", "10 char-chowk-road-2-junagadh", "fixed", "active", 21.5200, 70.4600, "Junagadh"),
+    cam(11, "GRID-CAM11", "11 dolatpara-junagadh", "fixed", "active", 21.4800, 70.4400, "Junagadh"),
+    cam(12, "GRID-CAM12", "12 Tri Mandir Adalaj Tollnaka", "anpr", "active", 23.1660, 72.5810, "Gandhinagar"),
+    cam(13, "GRID-CAM13", "13 CN Vidhyalaya", "fixed", "active", 23.0230, 72.5560, "Ahmedabad"),
+    cam(14, "GRID-CAM14", "14 Delight RLVD", "anpr", "active", 23.0300, 72.5800, "Ahmedabad"),
+    cam(15, "GRID-CAM15", "15 Suvidha park", "fixed", "active", 23.0400, 72.5300, "Ahmedabad"),
+    cam(16, "GRID-CAM16", "16 Visat P2", "anpr", "active", 23.1090, 72.5910, "Ahmedabad"),
+    cam(17, "GRID-CAM17", "17 Rajkot Bus Port CCTV", "fixed", "active", 22.3020, 70.7950, "Rajkot"),
+    cam(18, "GRID-CAM18", "18 Rajkot CCTV", "fixed", "active", 22.3030, 70.8020, "Rajkot"),
+    cam(19, "GRID-CAM19", "19 Khaparia Gram Panchayat, Gandevi", "fixed", "active", 20.8000, 72.9800, "Navsari"),
+    cam(20, "GRID-CAM20", "20 Mohanpura", "fixed", "active", 20.8500, 72.9200, "Navsari"),
+    cam(21, "GRID-CAM21", "23 Patan Dethali Char Rasta", "fixed", "active", 23.7500, 71.7500, "Patan"),
+    cam(22, "GRID-CAM22", "28 BK Mervada tran Rasta", "fixed", "active", 24.1000, 72.4000, "Banaskantha"),
+    cam(23, "GRID-CAM23", "30 kheram", "fixed", "active", 23.6000, 72.9000, "Aravalli"),
+    cam(24, "GRID-CAM24", "33 dehgam", "fixed", "active", 23.1700, 72.8200, "Gandhinagar"),
+    cam(25, "GRID-CAM25", "34 dhanori", "fixed", "active", 23.4000, 73.0000, "Aravalli"),
+    cam(26, "GRID-CAM26", "35 TANKAL", "fixed", "active", 20.9500, 72.9000, "Navsari"),
+    cam(27, "GRID-CAM27", "36 bilimora", "fixed", "active", 20.7680, 72.9600, "Navsari"),
+    cam(28, "GRID-CAM28", "37 bilimora", "fixed", "active", 20.7700, 72.9620, "Navsari"),
+    cam(29, "GRID-CAM29", "38 bilimora", "fixed", "active", 20.7660, 72.9580, "Navsari"),
+    cam(30, "GRID-CAM30", "Gandhidham Rambaugh p2", "fixed", "active", 23.0750, 70.1330, "Kutch"),
   ];
 
-  function cam(id, code, name, camera_type, status, lat, lon, bearing_deg, fov_deg, range_m, department, jurisdiction_path, isolated) {
+  function cam(id, code, name, camera_type, status, lat, lon, district) {
     return {
       camera_id: id, code, name, camera_type, status,
       location: { lat, lon },
-      bearing_deg, fov_deg, range_m,
-      department, jurisdiction_path, isolated,
+      bearing_deg: null, fov_deg: null, range_m: null,
+      department: "Gujarat State CCTV Grid", jurisdiction_path: district, isolated: false,
     };
   }
 

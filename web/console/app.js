@@ -1,726 +1,677 @@
-/* app.js — UI wiring: map, camera list, live feed, alerts, watchlist, auth.
+/* app.js — Control Room UI.
  *
- * All data comes from window.SentinelAPI (api.js). This file knows nothing about
- * whether that data is real or demo — it just renders whatever arrives, and
- * shows the DEMO/LIVE badge that api.js reports.
+ * Satellite map (Esri, free/keyless) with clustered camera pins; live HLS video
+ * in the camera panel and a multi-camera video wall; alerts with sound, type
+ * filters and a dispatch action; cross-camera vehicle tracking drawn on the map;
+ * women's-safety SOS + mode; and an English / Gujarati / Hindi interface.
  *
- * No inline event handlers anywhere (the console's CSP is script-src 'self'
- * with no 'unsafe-inline', so an onclick="" attribute would silently do
- * nothing) — everything is wired with addEventListener.
+ * Live video is played through the console's own origin (/grid/<id>/index.m3u8,
+ * proxied by nginx) so the browser stays same-origin and the grid password
+ * stays server-side. Where that proxy isn't configured (or the grid network
+ * isn't reachable), the player shows a clear message instead of erroring.
+ *
+ * Data comes from window.SentinelAPI. No inline handlers (CSP is script-src
+ * 'self'); every boot step is wrapped so one failure can't take the UI down.
  */
 (function () {
   "use strict";
 
-  // ---------------------------------------------------------------------
-  // A flat-earth projection for a small area, so the map works with no
-  // basemap tiles at all (the console's CSP is img-src 'self', which rules
-  // out fetching tiles from any real map provider — see web/nginx.conf).
-  // Leaflet's CRS.Simple treats coordinates as a plain (y, x) plane, so this
-  // just needs *a* consistent, roughly-metric mapping from lat/lon to it.
-  // ---------------------------------------------------------------------
-
-  const REF_LAT = 23.02;
-  const REF_LON = 72.55;
-  const UNITS_PER_DEGREE = 100000;
-  const METRES_PER_DEGREE_LAT = 111320;
-  const UNITS_PER_METRE = UNITS_PER_DEGREE / METRES_PER_DEGREE_LAT;
-  const LON_SCALE = Math.cos((REF_LAT * Math.PI) / 180);
-
-  function toPlane(lat, lon) {
-    const y = (lat - REF_LAT) * UNITS_PER_DEGREE;
-    const x = (lon - REF_LON) * UNITS_PER_DEGREE * LON_SCALE;
-    return L.latLng(y, x);
-  }
-
-  function sectorPolygon(centre, bearingDeg, fovDeg, rangeM) {
-    if (bearingDeg == null || fovDeg == null || !rangeM) return null;
-    const r = rangeM * UNITS_PER_METRE;
-    const points = [centre];
-    const start = bearingDeg - fovDeg / 2;
-    const steps = Math.max(2, Math.round(fovDeg / 8));
-    for (let i = 0; i <= steps; i++) {
-      const angle = ((start + (fovDeg * i) / steps) * Math.PI) / 180;
-      points.push(L.latLng(centre.lat + r * Math.cos(angle), centre.lng + r * Math.sin(angle)));
-    }
-    points.push(centre);
-    return points;
-  }
-
-  // ---------------------------------------------------------------------
-  // Status / severity → colour
-  // ---------------------------------------------------------------------
-
-  const STATUS_COLOR = {
-    active: "#2fe0c4",
-    faulty: "#ff5470",
-    maintenance: "#ffb443",
-    inactive: "#4a5568",
-    decommissioned: "#4a5568",
-    planned: "#4a5568",
+  // ---------------------------------------------------------------- i18n
+  const I18N = {
+    en: {
+      cameras: "Cameras", searchCameras: "Search name, code or district…", all: "All", live: "Live",
+      faulty: "Faulty", offline: "Offline", activeAlert: "active alert", fitAll: "Fit all cameras",
+      alerts: "Alerts", trackVehicle: "Track a vehicle", activity: "Activity", watchlistF: "Watchlist",
+      safetyF: "Women’s safety", otherF: "Other", search: "Search",
+      wlHint: "Search the watchlist, then open a vehicle to see its route across cameras on the map.",
+      openAlerts: "open alerts", metaNote: "Edge analytics are metadata-only · live video on demand.",
+      videoWall: "Video wall", womenSafety: "Women’s Safety", signInSub: "Sign in to the operator console",
+      username: "Username", password: "Password", signIn: "Sign in",
+      continueDemo: "Continue without signing in — demo data only →", raiseSos: "Raise an SOS",
+      sosBody: "This sends a real women’s-safety panic signal and opens a critical alert immediately — no login required, exactly as a public kiosk or the mobile app would send it.",
+      cancel: "Cancel", sendSos: "Send SOS", searchWatchlist: "Plate, name or case reference…",
+      showOnMap: "Show on map", trackRoute: "Track route", acknowledge: "Acknowledge", close: "Close",
+      dispatch: "Dispatch", trackRouteMap: "Track route on map", openDetails: "Open details",
+      liveView: "Live view", noStream: "No stream for this camera",
+      videoUnavail: "Live view unavailable here — enable the grid video proxy (nginx.conf) and open on the grid network.",
+      skipToMap: "Skip to map", dataPrivacy: "Data & Privacy",
+      privacyTitle: "Data & Privacy", privacyH1: "What is collected, and why",
+      privacyP1: "Camera metadata, number-plate reads and watchlist matches are logged against a stated purpose and case reference. Raw video is never stored by Sentinel — it is only ever proxied live, on demand.",
+      privacyH2: "Automated matching",
+      privacyP2: "Plate and face matching are automated; opening an alert is automated. Dispatching, closing or acting on an alert is always a human decision, recorded under the operator’s own identity.",
+      privacyH3: "Access control & audit",
+      privacyP3: "Every access is scoped by jurisdiction at the database level and written to an append-only, tamper-evident audit trail.",
+      privacyRef: "Full detail:",
+      usernameRequired: "Enter your username.", passwordRequired: "Enter your password.",
+      cameraAria: "camera", statusAria: "status",
+    },
+    gu: {
+      cameras: "કૅમેરા", searchCameras: "નામ, કોડ કે જિલ્લો શોધો…", all: "બધા", live: "લાઇવ",
+      faulty: "ખરાબ", offline: "ઑફલાઇન", activeAlert: "સક્રિય એલર્ટ", fitAll: "બધા કૅમેરા બતાવો",
+      alerts: "એલર્ટ", trackVehicle: "વાહન ટ્રૅક કરો", activity: "પ્રવૃત્તિ", watchlistF: "વૉચલિસ્ટ",
+      safetyF: "મહિલા સુરક્ષા", otherF: "અન્ય", search: "શોધો",
+      wlHint: "વૉચલિસ્ટ શોધો, પછી નકશા પર વાહનનો માર્ગ જોવા તેને ખોલો.",
+      openAlerts: "ખુલ્લા એલર્ટ", metaNote: "એજ એનાલિટિક્સ માત્ર મેટાડેટા · લાઇવ વિડિયો માંગ પ્રમાણે",
+      videoWall: "વિડિયો વૉલ", womenSafety: "મહિલા સુરક્ષા", signInSub: "ઑપરેટર કન્સોલમાં સાઇન ઇન કરો",
+      username: "વપરાશકર્તા નામ", password: "પાસવર્ડ", signIn: "સાઇન ઇન",
+      continueDemo: "સાઇન ઇન વગર ચાલુ રાખો — માત્ર ડેમો ડેટા →", raiseSos: "SOS મોકલો",
+      sosBody: "આ ખરેખરની મહિલા-સુરક્ષા પૅનિક સિગ્નલ મોકલે છે અને તરત જ ક્રિટિકલ એલર્ટ ખોલે છે — લૉગિન જરૂરી નથી.",
+      cancel: "રદ કરો", sendSos: "SOS મોકલો", searchWatchlist: "પ્લેટ, નામ કે કેસ સંદર્ભ…",
+      showOnMap: "નકશા પર બતાવો", trackRoute: "માર્ગ ટ્રૅક કરો", acknowledge: "સ્વીકારો", close: "બંધ કરો",
+      dispatch: "ડિસ્પૅચ", trackRouteMap: "નકશા પર માર્ગ ટ્રૅક કરો", openDetails: "વિગત ખોલો",
+      liveView: "લાઇવ દૃશ્ય", noStream: "આ કૅમેરા માટે કોઈ સ્ટ્રીમ નથી",
+      videoUnavail: "અહીં લાઇવ દૃશ્ય ઉપલબ્ધ નથી — ગ્રિડ વિડિયો પ્રૉક્સી ચાલુ કરો (nginx.conf) અને ગ્રિડ નેટવર્ક પર ખોલો.",
+      skipToMap: "નકશા પર જાઓ", dataPrivacy: "ડેટા અને ગોપનીયતા",
+      privacyTitle: "ડેટા અને ગોપનીયતા", privacyH1: "શું એકત્રિત થાય છે, અને શા માટે",
+      privacyP1: "કૅમેરા મેટાડેટા, નંબર પ્લેટ રીડિંગ્સ અને વૉચલિસ્ટ મેચ એક જણાવેલ હેતુ અને કેસ સંદર્ભ સામે લૉગ થાય છે. રો વિડિયો ક્યારેય સેન્ટિનલ દ્વારા સંગ્રહિત થતો નથી — તે ફક્ત માંગ પર લાઇવ પ્રોક્સી થાય છે.",
+      privacyH2: "સ્વયંસંચાલિત મેચિંગ",
+      privacyP2: "પ્લેટ અને ચહેરો મેચિંગ સ્વયંસંચાલિત છે; એલર્ટ ખોલવું સ્વયંસંચાલિત છે. ડિસ્પૅચ કરવું, બંધ કરવું અથવા એલર્ટ પર પગલાં લેવું હંમેશા માનવીય નિર્ણય છે, ઑપરેટરની પોતાની ઓળખ હેઠળ નોંધાયેલ.",
+      privacyH3: "ઍક્સેસ નિયંત્રણ અને ઑડિટ",
+      privacyP3: "દરેક ઍક્સેસ ડેટાબેઝ સ્તરે અધિકારક્ષેત્ર દ્વારા મર્યાદિત છે અને એક એપેન્ડ-ઓન્લી, ટેમ્પર-એવિડન્ટ ઑડિટ ટ્રેલમાં લખાય છે.",
+      privacyRef: "વિગત માટે:",
+      usernameRequired: "તમારું વપરાશકર્તા નામ દાખલ કરો.", passwordRequired: "તમારો પાસવર્ડ દાખલ કરો.",
+      cameraAria: "કૅમેરા", statusAria: "સ્થિતિ",
+    },
+    hi: {
+      cameras: "कैमरे", searchCameras: "नाम, कोड या ज़िला खोजें…", all: "सभी", live: "लाइव",
+      faulty: "खराब", offline: "ऑफ़लाइन", activeAlert: "सक्रिय अलर्ट", fitAll: "सभी कैमरे दिखाएँ",
+      alerts: "अलर्ट", trackVehicle: "वाहन ट्रैक करें", activity: "गतिविधि", watchlistF: "वॉचलिस्ट",
+      safetyF: "महिला सुरक्षा", otherF: "अन्य", search: "खोजें",
+      wlHint: "वॉचलिस्ट खोजें, फिर मानचित्र पर वाहन का मार्ग देखने के लिए उसे खोलें.",
+      openAlerts: "खुले अलर्ट", metaNote: "एज एनालिटिक्स केवल मेटाडेटा · लाइव वीडियो माँग पर",
+      videoWall: "वीडियो वॉल", womenSafety: "महिला सुरक्षा", signInSub: "ऑपरेटर कंसोल में साइन इन करें",
+      username: "उपयोगकर्ता नाम", password: "पासवर्ड", signIn: "साइन इन",
+      continueDemo: "बिना साइन इन जारी रखें — केवल डेमो डेटा →", raiseSos: "SOS भेजें",
+      sosBody: "यह वास्तविक महिला-सुरक्षा पैनिक संकेत भेजता है और तुरंत एक क्रिटिकल अलर्ट खोलता है — लॉगिन आवश्यक नहीं.",
+      cancel: "रद्द करें", sendSos: "SOS भेजें", searchWatchlist: "प्लेट, नाम या केस संदर्भ…",
+      showOnMap: "मानचित्र पर दिखाएँ", trackRoute: "मार्ग ट्रैक करें", acknowledge: "स्वीकारें", close: "बंद करें",
+      dispatch: "डिस्पैच", trackRouteMap: "मानचित्र पर मार्ग ट्रैक करें", openDetails: "विवरण खोलें",
+      liveView: "लाइव दृश्य", noStream: "इस कैमरे के लिए कोई स्ट्रीम नहीं",
+      videoUnavail: "यहाँ लाइव दृश्य उपलब्ध नहीं — ग्रिड वीडियो प्रॉक्सी सक्षम करें (nginx.conf) और ग्रिड नेटवर्क पर खोलें.",
+      skipToMap: "मानचित्र पर जाएँ", dataPrivacy: "डेटा और गोपनीयता",
+      privacyTitle: "डेटा और गोपनीयता", privacyH1: "क्या एकत्र किया जाता है, और क्यों",
+      privacyP1: "कैमरा मेटाडेटा, नंबर प्लेट रीडिंग और वॉचलिस्ट मैच एक बताए गए उद्देश्य और केस संदर्भ के विरुद्ध लॉग किए जाते हैं। रॉ वीडियो कभी भी सेंटिनल द्वारा संग्रहीत नहीं किया जाता — यह केवल माँग पर लाइव प्रॉक्सी किया जाता है।",
+      privacyH2: "स्वचालित मिलान",
+      privacyP2: "प्लेट और चेहरा मिलान स्वचालित है; अलर्ट खोलना स्वचालित है। डिस्पैच करना, बंद करना या अलर्ट पर कार्रवाई करना हमेशा एक मानवीय निर्णय है, जो ऑपरेटर की अपनी पहचान के तहत दर्ज होता है।",
+      privacyH3: "पहुँच नियंत्रण और ऑडिट",
+      privacyP3: "हर पहुँच डेटाबेस स्तर पर क्षेत्राधिकार द्वारा सीमित है और एक एपेंड-ओनली, छेड़छाड़-प्रतिरोधी ऑडिट ट्रेल में लिखी जाती है।",
+      privacyRef: "पूरी जानकारी:",
+      usernameRequired: "अपना उपयोगकर्ता नाम दर्ज करें।", passwordRequired: "अपना पासवर्ड दर्ज करें।",
+      cameraAria: "कैमरा", statusAria: "स्थिति",
+    },
   };
-  function statusColor(status) { return STATUS_COLOR[status] || STATUS_COLOR.inactive; }
-
-  // Demo/synthetic primitive events (no registry Alert behind them) are
-  // classified locally into the same three-tier feel the console has always
-  // had. Real alerts carry their own severity (services/common/alerts.py's
-  // SEVERITIES) and skip this entirely — see renderAlertItem.
-  const DEMO_ALERT_KINDS = new Set(["dwell", "abandoned", "proximity", "stream_gap"]);
-  const DEMO_INFO_KINDS = new Set(["anpr", "scene_change"]);
-  function demoSeverityClass(kind) {
-    if (DEMO_ALERT_KINDS.has(kind)) return "sev-urgent";
-    if (DEMO_INFO_KINDS.has(kind)) return "sev-info";
-    return "sev-routine";
+  let lang = "en";
+  try { lang = localStorage.getItem("sentinel_lang") || "en"; } catch (e) {}
+  function t(key, en) { return (I18N[lang] && I18N[lang][key]) || en || key; }
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const k = el.getAttribute("data-i18n"); const v = I18N[lang] && I18N[lang][k];
+      if (v) el.textContent = v;
+    });
+    document.querySelectorAll("[data-i18n-ph]").forEach((el) => {
+      const k = el.getAttribute("data-i18n-ph"); const v = I18N[lang] && I18N[lang][k];
+      if (v) el.setAttribute("placeholder", v);
+    });
   }
 
-  // ---------------------------------------------------------------------
-  // State
-  // ---------------------------------------------------------------------
+  // ---------------------------------------------------------------- map / video config
+  const SAT = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+  const SAT_ATTR = "Imagery &copy; Esri, Maxar, Earthstar Geographics";
+  const LABELS = "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
+  const CENTER = [22.6, 71.6], ZOOM = 7;
 
-  let cameras = [];
-  let markers = new Map(); // camera_id -> {marker, wedge}
-  let selectedCameraId = null;
-  let statusFilter = "all";
-  let searchTerm = "";
-  const liveTracks = new Set();
-  const alertsById = new Map(); // real alerts, keyed by id — lets SSE updates replace a card in place
-  let openAlertCount = 0;
-  let safetyMode = false;
+  const ANPR_KINDS = new Set(["watchlist_match_vehicle", "watchlist_match_person"]);
+  const SEV_RANK = { critical: 0, urgent: 1, advisory: 2, info: 3 };
 
-  let map;
+  function pinClass(status, alert, safety) {
+    if (alert) return "s-alert";
+    if (safety) return "s-isolated";
+    if (status === "active") return "s-active";
+    if (status === "faulty" || status === "maintenance") return "s-faulty";
+    return "s-inactive";
+  }
+  // GRID-CAM07 -> cam07 (the grid's stream id); null for non-grid cameras.
+  function gridId(c) {
+    const m = /^GRID-(CAM\d+)$/i.exec(c.code || "");
+    return m ? m[1].toLowerCase() : null;
+  }
 
-  // ---------------------------------------------------------------------
-  // Boot
-  // ---------------------------------------------------------------------
+  // ---------------------------------------------------------------- geo
+  function hav(a, b) { const R=6371, dLa=(b[0]-a[0])*Math.PI/180, dLo=(b[1]-a[1])*Math.PI/180;
+    const s=Math.sin(dLa/2)**2+Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLo/2)**2;
+    return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s)); }
+  function brg(a,b){ const p1=a[0]*Math.PI/180,p2=b[0]*Math.PI/180,dl=(b[1]-a[1])*Math.PI/180;
+    const y=Math.sin(dl)*Math.cos(p2),x=Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl);
+    return ((Math.atan2(y,x)*180/Math.PI)+360)%360; }
+  function compass(d){ return ["N","NE","E","SE","S","SW","W","NW"][Math.round(d/45)%8]; }
+
+  // ---------------------------------------------------------------- state
+  let cameras = [], map = null, cluster = null, markers = new Map(), trailLayer = null;
+  let statusFilter = "all", searchTerm = "", safetyMode = false, alertFilter = "all";
+  const liveTracks = new Set(), alertsById = new Map();
+  let openAlertCount = 0, audioCtx = null, seenAlertIds = new Set();
+  const hlsInstances = new Map();
 
   document.addEventListener("DOMContentLoaded", async () => {
-    // Each wiring step is independent of the others by design: a login form
-    // that can't be used because the map failed to load is a worse failure
-    // than a missing map, so no single step here is allowed to take the rest
-    // of the console down with it. safeStep() logs and moves on instead of
-    // letting one uncaught exception abort every listener queued after it —
-    // which is exactly what happened during development when vendor/leaflet
-    // was briefly absent from a checkout: initMap() threw, and nothing below
-    // it — including the login form — ever got wired.
-    safeStep("map", initMap);
-    safeStep("clock", initClock);
-    safeStep("sidebar controls", wireSidebarControls);
-    safeStep("tabs", wireTabs);
-    safeStep("drawer", wireDrawer);
-    safeStep("auth UI", wireAuthUI);
-    safeStep("safety mode", wireSafetyMode);
-    safeStep("SOS", wireSos);
-    safeStep("watchlist", wireWatchlist);
-
+    step("lang", () => { applyLang(); wireLang(); });
+    step("map", initMap);
+    step("clock", initClock);
+    step("sidebar", wireSidebar);
+    step("tabs", wireTabs);
+    step("alert-filters", wireAlertFilters);
+    step("drawer", wireDrawer);
+    step("wall", wireWall);
+    step("reset", () => document.getElementById("reset-view").addEventListener("click", fitToCameras));
+    step("auth", wireAuth);
+    step("safety", wireSafety);
+    step("sos", wireSos);
+    step("privacy", wirePrivacy);
+    step("watchlist", wireWatchlist);
+    step("overlay-escape", wireOverlayEscape);
     await boot();
   });
-
-  function safeStep(label, fn) {
-    try {
-      fn();
-    } catch (err) {
-      console.error("console init step failed:", label, err);
-    }
-  }
+  function step(l, fn) { try { fn(); } catch (e) { console.error("init:", l, e); } }
 
   async function boot() {
-    const session = window.SentinelAPI.getSession();
-    showLogin(!session);
-    updateUserChip(session ? session.user : null);
-
+    const s = window.SentinelAPI.getSession();
+    showLogin(!s); updateUserChip(s ? s.user : null);
     cameras = await window.SentinelAPI.fetchCameras();
-    renderCameraList();
-    plotCameras();
-    updateDataModeBadge();
-    updateStats();
-
-    if (session) await loadInitialAlerts();
-
+    renderCameraList(); plotCameras(); fitToCameras(); updateDataMode();
+    if (s) await loadAlerts(); else refreshAll();
     window.SentinelAPI.connectEvents(cameras, handleMessage);
-    setTimeout(updateDataModeBadge, 2700);
+    setTimeout(updateDataMode, 2600);
   }
 
-  function initMap() {
-    map = L.map("map", {
-      crs: L.CRS.Simple,
-      zoomControl: true,
-      attributionControl: false,
-      minZoom: -3,
-      maxZoom: 6,
+  function wireLang() {
+    const sel = document.getElementById("lang-select");
+    sel.value = lang;
+    sel.addEventListener("change", () => {
+      lang = sel.value; try { localStorage.setItem("sentinel_lang", lang); } catch (e) {}
+      applyLang(); refreshAll();
     });
-    map.setView([0, 0], 2);
   }
 
-  function initClock() {
-    const el = document.getElementById("clock");
-    const tick = () => { el.textContent = new Date().toLocaleTimeString("en-GB"); };
-    tick();
-    setInterval(tick, 1000);
+  // ---------------------------------------------------------------- map
+  function initMap() {
+    map = L.map("map", { zoomControl: true, minZoom: 5, maxZoom: 18 }).setView(CENTER, ZOOM);
+    L.tileLayer(SAT, { attribution: SAT_ATTR, maxZoom: 18 }).addTo(map);
+    L.tileLayer(LABELS, { maxZoom: 18, opacity: 0.9 }).addTo(map);
+    cluster = L.markerClusterGroup({ maxClusterRadius: 45, showCoverageOnHover: false, spiderfyOnMaxZoom: true });
+    map.addLayer(cluster);
   }
-
-  function updateDataModeBadge() {
-    const badge = document.getElementById("data-mode");
-    if (window.SentinelAPI.usingDemoData) {
-      badge.innerHTML = '<span class="badge-dot"></span>DEMO DATA';
-      badge.className = "badge badge-demo";
-      badge.title = "No live session or registry endpoint reachable — showing bundled demo cameras and a synthetic event feed shaped like the real one.";
-    } else {
-      badge.innerHTML = '<span class="badge-dot"></span>LIVE';
-      badge.className = "badge badge-live";
-      badge.title = "Connected to the registry API.";
+  function camLatLng(c) { return (c.location && c.location.lat != null) ? [c.location.lat, c.location.lon] : null; }
+  function camerasWithAlerts() {
+    const ids = new Set();
+    for (const a of alertsById.values())
+      if ((a.status === "open" || a.status === "acknowledged") && a.camera_id != null) ids.add(a.camera_id);
+    return ids;
+  }
+  function plotCameras() {
+    if (!map || !cluster) return;
+    cluster.clearLayers(); markers.clear();
+    const alerted = camerasWithAlerts();
+    for (const c of visibleCameras()) {
+      const ll = camLatLng(c); if (!ll) continue;
+      const cls = pinClass(c.status, alerted.has(c.camera_id), safetyMode && c.isolated);
+      const icon = L.divIcon({ className: "", html: '<div class="map-pin ' + cls + '"></div>', iconSize: [16,16], iconAnchor: [8,8] });
+      const m = L.marker(ll, { icon });
+      m.bindPopup(popupHtml(c));
+      m.on("popupopen", () => {
+        const b = document.querySelector(".popup-open[data-cam='" + c.camera_id + "']");
+        if (b) b.addEventListener("click", () => selectCamera(c.camera_id, false));
+      });
+      cluster.addLayer(m); markers.set(c.camera_id, m);
     }
   }
-
-  // ---------------------------------------------------------------------
-  // Auth: login overlay, user chip, sign out
-  // ---------------------------------------------------------------------
-
-  function wireAuthUI() {
-    const form = document.getElementById("login-form");
-    const errorEl = document.getElementById("login-error");
-    const submitBtn = document.getElementById("login-submit");
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      errorEl.textContent = "";
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Signing in…";
-      try {
-        const user = await window.SentinelAPI.login(
-          document.getElementById("login-username").value.trim(),
-          document.getElementById("login-password").value
-        );
-        updateUserChip(user);
-        showLogin(false);
-        await loadInitialAlerts();
-        cameras = await window.SentinelAPI.fetchCameras();
-        renderCameraList();
-        plotCameras();
-        updateDataModeBadge();
-        updateStats();
-        window.SentinelAPI.connectEvents(cameras, handleMessage);
-      } catch (err) {
-        errorEl.textContent = err.message || "sign-in failed";
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Sign in";
-      }
-    });
-
-    document.getElementById("login-demo").addEventListener("click", () => showLogin(false));
-
-    document.getElementById("user-chip").addEventListener("click", async () => {
-      if (!confirm("Sign out of the console?")) return;
-      await window.SentinelAPI.logout();
-      updateUserChip(null);
-      location.reload();
-    });
+  function fitToCameras() {
+    if (!map) return;
+    const pts = cameras.map(camLatLng).filter(Boolean);
+    if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.15)); else map.setView(CENTER, ZOOM);
+  }
+  function popupHtml(c) {
+    return '<div><b>' + esc(c.name) + '</b><div class="popup-sub">' + esc(c.code) + ' &middot; ' + esc(c.status) + '</div>' +
+      '<div class="popup-sub">' + esc(c.jurisdiction_path || c.department || "") + '</div>' +
+      '<span class="popup-open" data-cam="' + c.camera_id + '">' + t("openDetails","Open details") + ' &rarr;</span></div>';
   }
 
-  function showLogin(visible) {
-    document.getElementById("login-overlay").hidden = !visible;
+  // ---------------------------------------------------------------- HLS video
+  function attachHls(videoEl, url, msgEl, spinnerEl) {
+    detachHls(videoEl, spinnerEl);
+    if (msgEl) msgEl.textContent = "";
+    if (spinnerEl) spinnerEl.hidden = false;
+    let failed = false, started = false;
+    const stopSpinner = () => { if (spinnerEl) spinnerEl.hidden = true; };
+    const fail = () => { if (!failed) { failed = true; if (msgEl) msgEl.textContent = t("videoUnavail"); stopSpinner(); } };
+    videoEl.addEventListener("playing", () => { started = true; stopSpinner(); }, { once: true });
+    try {
+      if (window.Hls && window.Hls.isSupported()) {
+        const h = new window.Hls({ liveDurationInfinity: true, maxBufferLength: 8, manifestLoadingTimeOut: 8000 });
+        h.loadSource(url); h.attachMedia(videoEl);
+        h.on(window.Hls.Events.ERROR, (evt, data) => { if (data && data.fatal) { fail(); try { h.destroy(); } catch (e) {} hlsInstances.delete(videoEl); } });
+        hlsInstances.set(videoEl, h);
+        videoEl.play().catch(() => {});
+      } else if (videoEl.canPlayType("application/vnd.apple.mpegurl")) {
+        videoEl.src = url; videoEl.addEventListener("error", fail, { once: true }); videoEl.play().catch(() => {});
+      } else { fail(); }
+    } catch (e) { fail(); }
+    // Safety net: if nothing is playing shortly, show the message.
+    setTimeout(() => { if (!started && videoEl.readyState < 2) fail(); }, 9000);
+  }
+  function detachHls(videoEl, spinnerEl) {
+    const h = hlsInstances.get(videoEl);
+    if (h) { try { h.destroy(); } catch (e) {} hlsInstances.delete(videoEl); }
+    try { videoEl.pause(); } catch (e) {}
+    videoEl.removeAttribute("src"); try { videoEl.load(); } catch (e) {}
+    if (spinnerEl) spinnerEl.hidden = true;
   }
 
-  function updateUserChip(user) {
-    const chip = document.getElementById("user-chip");
-    if (!user) { chip.hidden = true; return; }
-    chip.hidden = false;
-    document.getElementById("user-name").textContent = user.username;
-    document.getElementById("user-avatar").textContent = user.username.slice(0, 2).toUpperCase();
-    chip.title = (user.is_statewide ? "Statewide" : user.jurisdiction_path || "") + " · " + user.permissions.length + " permissions — click to sign out";
+  // ---------------------------------------------------------------- cameras list / drawer
+  function wireSidebar() {
+    document.getElementById("camera-search").addEventListener("input", (e) => { searchTerm = e.target.value.trim().toLowerCase(); renderCameraList(); plotCameras(); });
+    document.querySelectorAll("#status-filters .chip").forEach((chip) => chip.addEventListener("click", () => {
+      document.querySelectorAll("#status-filters .chip").forEach((c) => { c.classList.remove("chip-active"); c.setAttribute("aria-pressed", "false"); });
+      chip.classList.add("chip-active"); chip.setAttribute("aria-pressed", "true");
+      statusFilter = chip.dataset.status; renderCameraList(); plotCameras();
+    }));
   }
-
-  // ---------------------------------------------------------------------
-  // Women's Safety Mode
-  // ---------------------------------------------------------------------
-
-  function wireSafetyMode() {
-    document.getElementById("safety-toggle").addEventListener("click", () => {
-      safetyMode = !safetyMode;
-      document.getElementById("safety-toggle").classList.toggle("on", safetyMode);
-      document.body.classList.toggle("safety-mode", safetyMode);
-      plotCameras();
-      if (safetyMode) {
-        toast("Women’s Safety Mode: isolated zones highlighted, SOS + safety alerts prioritised.");
-        document.querySelector('.tab[data-tab="alerts"]').click();
-      }
-    });
-  }
-
-  function toast(message) {
-    const el = document.getElementById("map-toast");
-    el.textContent = message;
-    el.classList.add("show");
-    clearTimeout(toast._t);
-    toast._t = setTimeout(() => el.classList.remove("show"), 4200);
-  }
-
-  // ---------------------------------------------------------------------
-  // SOS
-  // ---------------------------------------------------------------------
-
-  function wireSos() {
-    const modal = document.getElementById("sos-modal");
-    document.getElementById("sos-btn").addEventListener("click", () => { modal.hidden = false; });
-    document.getElementById("sos-cancel").addEventListener("click", () => { modal.hidden = true; });
-    document.getElementById("sos-confirm").addEventListener("click", async () => {
-      const btn = document.getElementById("sos-confirm");
-      btn.disabled = true;
-      btn.textContent = "Sending…";
-      try {
-        const camera = cameras.find((c) => c.camera_id === selectedCameraId) || cameras[0];
-        await window.SentinelAPI.reportSos({
-          channel: "operator",
-          camera_id: camera ? camera.camera_id : null,
-          lat: camera ? camera.location.lat : null,
-          lon: camera ? camera.location.lon : null,
-          notes: "Raised from the operator console (demo).",
-        });
-        toast("SOS sent — a critical alert has been opened.");
-        modal.hidden = true;
-        await loadInitialAlerts();
-      } catch (err) {
-        toast("SOS failed to send: " + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Send SOS";
-      }
-    });
-  }
-
-  // ---------------------------------------------------------------------
-  // Camera list + filters
-  // ---------------------------------------------------------------------
-
-  function wireSidebarControls() {
-    document.getElementById("camera-search").addEventListener("input", (e) => {
-      searchTerm = e.target.value.trim().toLowerCase();
-      renderCameraList();
-    });
-
-    const chips = document.querySelectorAll("#status-filters .chip");
-    chips.forEach((chip) => {
-      chip.addEventListener("click", () => {
-        chips.forEach((c) => c.classList.remove("chip-active"));
-        chip.classList.add("chip-active");
-        statusFilter = chip.dataset.status;
-        renderCameraList();
-        plotCameras();
-      });
-    });
-  }
-
   function visibleCameras() {
     return cameras.filter((c) => {
-      if (statusFilter !== "all" && c.status !== statusFilter) return false;
+      if (statusFilter === "active" && c.status !== "active") return false;
+      if (statusFilter === "faulty" && !(c.status === "faulty" || c.status === "maintenance")) return false;
+      if (statusFilter === "inactive" && !(c.status === "inactive" || c.status === "decommissioned")) return false;
       if (!searchTerm) return true;
-      const hay = (c.code + " " + c.name + " " + (c.jurisdiction_path || "")).toLowerCase();
-      return hay.includes(searchTerm);
+      return (c.code + " " + c.name + " " + (c.jurisdiction_path || "")).toLowerCase().includes(searchTerm);
     });
   }
-
   function renderCameraList() {
-    const list = document.getElementById("camera-list");
-    const rows = visibleCameras();
+    const list = document.getElementById("camera-list"), rows = visibleCameras();
+    list.setAttribute("aria-busy", "false");
+    document.getElementById("cam-count").textContent = rows.length + " / " + cameras.length;
     list.innerHTML = "";
-    if (!rows.length) {
-      list.innerHTML = '<li class="empty-note">No cameras match.</li>';
-      return;
-    }
+    if (!rows.length) { list.innerHTML = '<li class="empty-note">—</li>'; return; }
+    const alerted = camerasWithAlerts();
     for (const c of rows) {
-      const li = document.createElement("li");
-      li.className = "camera-row" + (c.camera_id === selectedCameraId ? " selected" : "");
-      li.innerHTML =
-        '<span class="dot" style="background:' + statusColor(c.status) + '"></span>' +
-        '<span class="meta"><span class="code"></span><span class="name"></span></span>' +
-        (c.isolated ? '<span class="isolated-flag" title="Isolated zone">&#9888;</span>' : "");
-      li.querySelector(".code").textContent = c.code;
-      li.querySelector(".name").textContent = c.name;
+      const li = document.createElement("li"); li.className = "camera-row";
+      li.tabIndex = 0; li.setAttribute("role", "button");
+      li.setAttribute("aria-label", c.name + ", " + t("cameraAria","camera") + " " + c.code + ", " + t("statusAria","status") + " " + c.status);
+      const cls = pinClass(c.status, alerted.has(c.camera_id), false);
+      const color = { "s-active":"#22c55e","s-alert":"#ef4444","s-faulty":"#f59e0b","s-inactive":"#64748b","s-isolated":"#ec4899" }[cls];
+      li.innerHTML = '<span class="cam-dot" style="background:' + color + '"></span><span class="meta"><span class="code"></span><span class="name"></span></span>';
+      li.querySelector(".code").textContent = c.name;
+      li.querySelector(".name").textContent = c.code + " · " + (c.jurisdiction_path || "");
       li.addEventListener("click", () => selectCamera(c.camera_id, true));
+      li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectCamera(c.camera_id, true); } });
       list.appendChild(li);
     }
   }
-
-  // ---------------------------------------------------------------------
-  // Map markers
-  // ---------------------------------------------------------------------
-
-  function plotCameras() {
-    if (!map) return; // Leaflet failed to load — see safeStep() in the boot handler.
-    for (const { marker, wedge } of markers.values()) {
-      map.removeLayer(marker);
-      if (wedge) map.removeLayer(wedge);
-    }
-    markers.clear();
-
-    const rows = visibleCameras();
-    const bounds = [];
-    for (const c of rows) {
-      const pos = toPlane(c.location.lat, c.location.lon);
-      bounds.push(pos);
-
-      const highlightIsolated = safetyMode && c.isolated;
-      const ringColor = highlightIsolated ? "#ff5da2" : statusColor(c.status);
-
-      let wedge = null;
-      const sector = sectorPolygon(pos, c.bearing_deg, c.fov_deg, c.range_m);
-      if (sector) {
-        wedge = L.polygon(sector, {
-          color: ringColor,
-          weight: 1,
-          fillColor: ringColor,
-          fillOpacity: highlightIsolated ? 0.14 : 0.08,
-          opacity: highlightIsolated ? 0.6 : 0.35,
-          interactive: false,
-        }).addTo(map);
-      }
-
-      const marker = L.circleMarker(pos, {
-        radius: highlightIsolated ? 9 : 7,
-        color: highlightIsolated ? "#ff5da2" : "#070a10",
-        weight: highlightIsolated ? 2.5 : 1.5,
-        fillColor: statusColor(c.status),
-        fillOpacity: 0.95,
-      }).addTo(map);
-      marker.bindPopup(popupHtml(c));
-      marker.on("click", () => selectCamera(c.camera_id, false));
-
-      markers.set(c.camera_id, { marker, wedge });
-    }
-
-    if (bounds.length) {
-      map.fitBounds(L.latLngBounds(bounds).pad(0.25));
-    }
+  function selectCamera(id, pan) {
+    const c = cameras.find((x) => x.camera_id === id); if (!c) return;
+    const ll = camLatLng(c), m = markers.get(id);
+    if (pan && ll && map) map.setView(ll, Math.max(map.getZoom(), 13), { animate: true });
+    if (m) m.openPopup();
+    openDrawer(c);
   }
-
-  function popupHtml(c) {
-    return (
-      '<div><b>' + escapeHtml(c.name) + '</b><br>' +
-      '<span class="popup-code">' + escapeHtml(c.code) + "</span>" +
-      '<div class="popup-row">' + escapeHtml(c.camera_type) + " &middot; " + escapeHtml(c.status) + "</div>" +
-      '<div class="popup-row">' + escapeHtml(c.department || "") + "</div>" +
-      (c.isolated ? '<div class="popup-row" style="color:#ff5da2">&#9888; isolated zone</div>' : "") +
-      "</div>"
-    );
-  }
-
-  function selectCamera(cameraId, panMap) {
-    selectedCameraId = cameraId;
-    renderCameraList();
-    const camera = cameras.find((c) => c.camera_id === cameraId);
-    if (!camera) return;
-    if (panMap) {
-      const entry = markers.get(cameraId);
-      if (entry) { map.panTo(entry.marker.getLatLng()); entry.marker.openPopup(); }
-    }
-    openDrawer(camera);
-  }
-
-  // ---------------------------------------------------------------------
-  // Camera detail drawer
-  // ---------------------------------------------------------------------
-
-  function wireDrawer() {
-    document.getElementById("cd-close").addEventListener("click", closeDrawer);
-  }
+  let lastFocusEl = null;
+  function wireDrawer() { document.getElementById("cd-close").addEventListener("click", closeDrawer); }
   function openDrawer(c) {
-    document.getElementById("cd-title").textContent = c.code;
-    const body = document.getElementById("cd-body");
-    body.innerHTML = "";
+    lastFocusEl = document.activeElement;
+    document.getElementById("cd-title").textContent = c.name;
+    const player = document.getElementById("cd-player"), msg = document.getElementById("cd-video-msg"), spin = document.getElementById("cd-video-spinner");
+    const gid = gridId(c);
+    if (gid && c.status === "active") attachHls(player, "/grid/" + gid + "/index.m3u8", msg, spin);
+    else { detachHls(player, spin); msg.textContent = gid ? "" : t("noStream", "No stream for this camera"); }
+    const body = document.getElementById("cd-body"); body.innerHTML = "";
+    const ll = camLatLng(c);
     const fields = [
-      ["Name", c.name],
-      ["Type", c.camera_type],
-      ["Status", c.status],
-      ["Department", c.department || "—"],
-      ["Jurisdiction", c.jurisdiction_path || "—"],
-      ["Location", c.location.lat.toFixed(5) + ", " + c.location.lon.toFixed(5)],
-      ["Coverage", c.bearing_deg != null ? c.bearing_deg + "° bearing, " + c.fov_deg + "° FOV, " + c.range_m + "m range" : "—"],
-      ["Zone", c.isolated ? "Isolated — flagged for women's-safety analytics" : "Standard"],
+      ["", t("liveView","Live view")], ["Camera code", c.code], ["Type", c.camera_type], ["Status", c.status],
+      ["District / area", c.jurisdiction_path || "—"], ["Operator", c.department || "—"],
+      ["Location", ll ? ll[0].toFixed(5) + ", " + ll[1].toFixed(5) : "—"],
     ];
-    for (const [label, value] of fields) {
-      const dt = document.createElement("dt"); dt.textContent = label;
-      const dd = document.createElement("dd"); dd.textContent = value;
-      body.appendChild(dt); body.appendChild(dd);
-    }
+    for (const [k, v] of fields) { if (!k) continue; const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; body.appendChild(dt); body.appendChild(dd); }
     document.getElementById("camera-detail").hidden = false;
+    document.getElementById("cd-close").focus();
   }
-  function closeDrawer() { document.getElementById("camera-detail").hidden = true; }
+  function closeDrawer() {
+    detachHls(document.getElementById("cd-player"), document.getElementById("cd-video-spinner"));
+    document.getElementById("camera-detail").hidden = true;
+    if (lastFocusEl && document.contains(lastFocusEl)) lastFocusEl.focus();
+  }
 
-  // ---------------------------------------------------------------------
-  // Tabs
-  // ---------------------------------------------------------------------
+  // ---------------------------------------------------------------- video wall
+  function wireWall() {
+    document.getElementById("wall-btn").addEventListener("click", openWall);
+    document.getElementById("wall-close").addEventListener("click", closeWall);
+  }
+  function openWall() {
+    lastFocusEl = document.activeElement;
+    const grid = document.getElementById("wall-grid"); grid.innerHTML = "";
+    const live = cameras.filter((c) => c.status === "active" && gridId(c)).slice(0, 12);
+    document.getElementById("wall-sub").textContent = live.length + " " + t("live","live");
+    live.forEach((c) => {
+      const tile = document.createElement("div"); tile.className = "wall-tile";
+      tile.innerHTML = '<video class="wall-video" playsinline muted></video><div class="video-spinner" hidden aria-hidden="true"></div><div class="wall-label"></div><div class="wall-msg"></div>';
+      tile.querySelector(".wall-label").textContent = c.name;
+      grid.appendChild(tile);
+      attachHls(tile.querySelector("video"), "/grid/" + gridId(c) + "/index.m3u8", tile.querySelector(".wall-msg"), tile.querySelector(".video-spinner"));
+    });
+    if (!live.length) grid.innerHTML = '<div class="empty-note">No live grid cameras to show.</div>';
+    document.getElementById("wall-overlay").hidden = false;
+    document.getElementById("wall-close").focus();
+  }
+  function closeWall() {
+    document.querySelectorAll("#wall-grid .wall-tile").forEach((tile) => detachHls(tile.querySelector("video"), tile.querySelector(".video-spinner")));
+    document.getElementById("wall-grid").innerHTML = "";
+    document.getElementById("wall-overlay").hidden = true;
+    if (lastFocusEl && document.contains(lastFocusEl)) lastFocusEl.focus();
+  }
 
+  // ---------------------------------------------------------------- tabs / filters
   function wireTabs() {
     const tabs = document.querySelectorAll("#panel-tabs .tab");
-    tabs.forEach((tab) => {
-      tab.addEventListener("click", () => {
-        tabs.forEach((t) => t.classList.remove("tab-active"));
-        tab.classList.add("tab-active");
-        document.querySelectorAll(".tab-body").forEach((b) => b.classList.remove("tab-body-active"));
-        document.getElementById("tab-" + tab.dataset.tab).classList.add("tab-body-active");
-      });
+    tabs.forEach((tab) => tab.addEventListener("click", () => {
+      tabs.forEach((x) => x.classList.remove("tab-active")); tab.classList.add("tab-active");
+      document.querySelectorAll(".tab-body").forEach((b) => b.classList.remove("tab-body-active"));
+      document.getElementById("tab-" + tab.dataset.tab).classList.add("tab-body-active");
+    }));
+  }
+  function wireAlertFilters() {
+    document.querySelectorAll("#alert-filters .fchip").forEach((chip) => chip.addEventListener("click", () => {
+      document.querySelectorAll("#alert-filters .fchip").forEach((c) => { c.classList.remove("fchip-active"); c.setAttribute("aria-pressed", "false"); });
+      chip.classList.add("fchip-active"); chip.setAttribute("aria-pressed", "true");
+      alertFilter = chip.dataset.filter; renderAlerts();
+    }));
+  }
+
+  // ---------------------------------------------------------------- auth
+  function wireAuth() {
+    const form = document.getElementById("login-form"), err = document.getElementById("login-error"), btn = document.getElementById("login-submit");
+    const userIn = document.getElementById("login-username"), passIn = document.getElementById("login-password");
+    const userErr = document.getElementById("login-username-err"), passErr = document.getElementById("login-password-err");
+
+    function validateField(input, errEl, key, fallback) {
+      const ok = input.value.trim().length > 0;
+      errEl.textContent = ok ? "" : t(key, fallback);
+      input.classList.toggle("invalid", !ok);
+      input.setAttribute("aria-invalid", ok ? "false" : "true");
+      return ok;
+    }
+    userIn.addEventListener("blur", () => validateField(userIn, userErr, "usernameRequired", "Enter your username."));
+    passIn.addEventListener("blur", () => validateField(passIn, passErr, "passwordRequired", "Enter your password."));
+    userIn.addEventListener("input", () => { if (userErr.textContent) validateField(userIn, userErr, "usernameRequired", "Enter your username."); });
+    passIn.addEventListener("input", () => { if (passErr.textContent) validateField(passIn, passErr, "passwordRequired", "Enter your password."); });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault(); err.textContent = "";
+      const userOk = validateField(userIn, userErr, "usernameRequired", "Enter your username.");
+      const passOk = validateField(passIn, passErr, "passwordRequired", "Enter your password.");
+      if (!userOk || !passOk) { (userOk ? passIn : userIn).focus(); return; }
+      btn.disabled = true; btn.textContent = "…";
+      try {
+        const u = await window.SentinelAPI.login(userIn.value.trim(), passIn.value);
+        updateUserChip(u); showLogin(false);
+        cameras = await window.SentinelAPI.fetchCameras();
+        renderCameraList(); plotCameras(); fitToCameras(); updateDataMode(); await loadAlerts();
+        window.SentinelAPI.connectEvents(cameras, handleMessage);
+      } catch (e2) { err.textContent = e2.message || "sign-in failed"; }
+      finally { btn.disabled = false; btn.textContent = t("signIn","Sign in"); }
+    });
+    document.getElementById("login-demo").addEventListener("click", () => showLogin(false));
+    document.getElementById("user-chip").addEventListener("click", async () => { if (confirm("Sign out?")) { await window.SentinelAPI.logout(); location.reload(); } });
+  }
+  function showLogin(v) { document.getElementById("login-overlay").hidden = !v; }
+  function updateUserChip(u) {
+    const chip = document.getElementById("user-chip");
+    if (!u) { chip.hidden = true; return; }
+    chip.hidden = false;
+    document.getElementById("user-name").textContent = u.username;
+    document.getElementById("user-avatar").textContent = u.username.slice(0, 2).toUpperCase();
+  }
+  function updateDataMode() {
+    const badge = document.getElementById("data-mode"), dot = document.getElementById("tel-dot"), mode = document.getElementById("tel-mode");
+    if (window.SentinelAPI.usingDemoData) { badge.className = "badge badge-demo"; badge.innerHTML = '<span class="badge-dot"></span>DEMO DATA'; dot.className = "tel-dot"; mode.textContent = "Demo data"; }
+    else { badge.className = "badge badge-live"; badge.innerHTML = '<span class="badge-dot"></span>LIVE'; dot.className = "tel-dot live"; mode.textContent = "Live"; }
+  }
+
+  // ---------------------------------------------------------------- safety / sos
+  function wireSafety() {
+    document.getElementById("safety-toggle").addEventListener("click", () => {
+      safetyMode = !safetyMode;
+      document.getElementById("safety-toggle").classList.toggle("on", safetyMode);
+      plotCameras(); renderAlerts();
+      toast(safetyMode ? "Women’s Safety mode on — SOS and safety alerts prioritised." : "Women’s Safety mode off.", true);
+      if (safetyMode) document.querySelector('.tab[data-tab="alerts"]').click();
+    });
+  }
+  function toast(m, s) { const el = document.getElementById("map-toast"); el.textContent = m; el.className = "show" + (s ? " safety" : ""); clearTimeout(toast._t); toast._t = setTimeout(() => { el.className = ""; }, 4200); }
+  function wireSos() {
+    const modal = document.getElementById("sos-modal");
+    const closeSos = () => { modal.hidden = true; if (lastFocusEl && document.contains(lastFocusEl)) lastFocusEl.focus(); };
+    document.getElementById("sos-btn").addEventListener("click", () => { lastFocusEl = document.activeElement; modal.hidden = false; document.getElementById("sos-cancel").focus(); });
+    document.getElementById("sos-cancel").addEventListener("click", closeSos);
+    document.getElementById("sos-confirm").addEventListener("click", async () => {
+      const b = document.getElementById("sos-confirm"); b.disabled = true; b.textContent = "…";
+      try {
+        const c = cameras[0], ll = c ? camLatLng(c) : null;
+        await window.SentinelAPI.reportSos({ channel: "operator", camera_id: c ? c.camera_id : null, lat: ll ? ll[0] : null, lon: ll ? ll[1] : null, notes: "Raised from the control room." });
+        toast("SOS sent — a critical alert has been opened.", true); closeSos(); await loadAlerts();
+      } catch (e) { toast("SOS failed: " + e.message, true); }
+      finally { b.disabled = false; b.textContent = t("sendSos","Send SOS"); }
     });
   }
 
-  // ---------------------------------------------------------------------
-  // Live event feed + alerts
-  // ---------------------------------------------------------------------
+  // ---------------------------------------------------------------- data & privacy
+  function wirePrivacy() {
+    const modal = document.getElementById("privacy-modal");
+    document.getElementById("privacy-btn").addEventListener("click", () => {
+      lastFocusEl = document.activeElement; modal.hidden = false; document.getElementById("privacy-close").focus();
+    });
+    document.getElementById("privacy-close").addEventListener("click", () => {
+      modal.hidden = true; if (lastFocusEl && document.contains(lastFocusEl)) lastFocusEl.focus();
+    });
+  }
 
-  const MAX_FEED_ITEMS = 80;
+  // Escape closes whichever overlay/modal/drawer is currently open, and
+  // returns focus to whatever opened it — keyboard-only operators shouldn't
+  // need a mouse to back out of the video wall, a camera drawer, or a modal.
+  function wireOverlayEscape() {
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      const wall = document.getElementById("wall-overlay"), drawer = document.getElementById("camera-detail");
+      const sos = document.getElementById("sos-modal"), privacy = document.getElementById("privacy-modal");
+      if (privacy && !privacy.hidden) document.getElementById("privacy-close").click();
+      else if (sos && !sos.hidden) document.getElementById("sos-cancel").click();
+      else if (wall && !wall.hidden) closeWall();
+      else if (drawer && !drawer.hidden) closeDrawer();
+    });
+  }
 
-  /** Every SSE / synthetic message arrives here as {type, event|alert}. */
+  // ---------------------------------------------------------------- alert sound
+  function beep(critical) {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination);
+      o.frequency.value = critical ? 880 : 620; o.type = "sine";
+      g.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+      o.start(); o.stop(audioCtx.currentTime + 0.42);
+      if (critical) setTimeout(() => beep(false), 260);
+    } catch (e) {}
+  }
+
+  // ---------------------------------------------------------------- live feed
+  const MAX_FEED = 60;
   function handleMessage(msg) {
     if (!msg || !msg.type) return;
     if (msg.type === "event") return handleEvent(msg.event);
     if (msg.type === "alert.created" || msg.type === "alert.updated") return handleAlert(msg.alert);
   }
-
   function handleEvent(evt) {
     if (evt.kind === "track_start" && evt.track_id) liveTracks.add(evt.track_id);
     if (evt.kind === "track_end" && evt.track_id) liveTracks.delete(evt.track_id);
-    appendEventItem(evt);
-    updateStats();
+    appendActivity(evt); updateStats();
   }
-
-  function appendEventItem(evt) {
-    const list = document.getElementById("events-list");
-    const empty = list.querySelector(".empty-note");
-    if (empty) empty.remove();
-
-    const camera = cameras.find((c) => c.camera_id === evt.camera_id);
-    const li = document.createElement("li");
-    li.className = "feed-item " + demoSeverityClass(evt.kind);
-    const time = new Date(evt.ts);
-    li.innerHTML =
-      '<div class="feed-head"><span class="feed-kind"></span><span class="feed-time"></span></div>' +
-      '<div class="feed-cam"></div><div class="feed-detail"></div>';
-    li.querySelector(".feed-kind").textContent = evt.kind;
-    li.querySelector(".feed-time").textContent = time.toLocaleTimeString("en-GB");
-    li.querySelector(".feed-cam").textContent =
-      (camera ? camera.code : "camera " + evt.camera_id) + (evt.track_id ? " · " + evt.track_id : "");
-    li.querySelector(".feed-detail").textContent = summarisePayload(evt);
-
+  function appendActivity(evt) {
+    const list = document.getElementById("events-list"); const em = list.querySelector(".empty-note"); if (em) em.remove();
+    const c = cameras.find((x) => x.camera_id === evt.camera_id);
+    const li = document.createElement("li"); li.className = "feed-item sev-routine";
+    li.innerHTML = '<div class="feed-head"><span class="feed-kind"></span><span class="feed-time"></span></div><div class="feed-cam"></div><div class="feed-detail"></div>';
+    li.querySelector(".feed-kind").textContent = (evt.kind || "").replace(/_/g, " ");
+    li.querySelector(".feed-time").textContent = new Date(evt.ts).toLocaleTimeString("en-GB");
+    li.querySelector(".feed-cam").textContent = c ? c.name : "camera " + evt.camera_id;
+    li.querySelector(".feed-detail").textContent = summarise(evt);
     list.insertBefore(li, list.firstChild);
-    while (list.children.length > MAX_FEED_ITEMS) list.removeChild(list.lastChild);
+    while (list.children.length > MAX_FEED) list.removeChild(list.lastChild);
   }
-
-  function summarisePayload(evt) {
-    const p = evt.payload || evt.detail || {};
-    switch (evt.kind) {
-      case "anpr":
-      case "plate_read":
-        return "plate " + (p.plate_text || "?") + " (conf " + fmtConf(p.confidence) + (p.format_valid === false ? ", format invalid" : "") + ")";
-      case "track_start":
-      case "track_update":
-      case "track_end":
-        return (p.class_label || "") + (p.confidence != null ? " conf " + fmtConf(p.confidence) : "") + (p.duration_seconds != null ? " · " + p.duration_seconds + "s" : "");
-      case "dwell":
-        return (p.class_label || "") + " dwelling " + (p.dwell_seconds || "?") + "s in " + (p.zone_id || "zone");
-      case "proximity":
-        return "sustained " + (p.seconds || "?") + "s at close range";
-      case "stream_gap":
-        return "camera unreachable for " + (p.gap_seconds || "?") + "s (" + (p.reason || "unknown") + ")";
-      case "scene_change":
-        return "scene discontinuity (" + (p.reason || "unknown") + ")";
-      default:
-        try { return JSON.stringify(p); } catch (e) { return ""; }
-    }
+  function summarise(e) {
+    const p = e.payload || {};
+    if (e.kind === "anpr") return "plate " + (p.plate_text || "?") + " (" + fmt(p.confidence) + ")";
+    if (e.kind.startsWith("track")) return (p.class_label || "") + (p.confidence != null ? " · " + fmt(p.confidence) : "");
+    if (e.kind === "dwell") return (p.class_label || "") + " waiting " + (p.dwell_seconds || "?") + "s";
+    if (e.kind === "proximity") return "two people close for " + (p.seconds || "?") + "s";
+    if (e.kind === "stream_gap") return "camera dropped for " + (p.gap_seconds || "?") + "s";
+    try { return JSON.stringify(p); } catch (x) { return ""; }
   }
-  function fmtConf(v) { return typeof v === "number" ? v.toFixed(2) : "?"; }
+  function fmt(v) { return typeof v === "number" ? Math.round(v*100) + "%" : "?"; }
 
-  // ---------------------------------------------------------------------
-  // Real alerts (services/common/alerts.py's kind/severity/status taxonomy)
-  // ---------------------------------------------------------------------
-
-  async function loadInitialAlerts() {
-    const alerts = await window.SentinelAPI.fetchAlerts();
-    if (!alerts) return;
-    alertsById.clear();
-    for (const a of alerts) alertsById.set(a.id, a);
-    renderAlertsList();
+  // ---------------------------------------------------------------- alerts
+  async function loadAlerts() {
+    const a = await window.SentinelAPI.fetchAlerts();
+    if (a) { alertsById.clear(); seenAlertIds = new Set(a.map((x) => x.id)); for (const x of a) alertsById.set(x.id, x); }
+    refreshAll();
   }
-
-  function handleAlert(alert) {
-    if (!alert || alert.id == null) return;
-    alertsById.set(alert.id, alert);
-    renderAlertsList();
-    if (alert.kind === "sos" || alert.kind === "women_safety_risk") {
-      toast((alert.kind === "sos" ? "SOS: " : "Women’s safety alert: ") + alert.summary);
+  function handleAlert(a) {
+    if (!a || a.id == null) return;
+    const isNew = !seenAlertIds.has(a.id) && (a.status === "open");
+    seenAlertIds.add(a.id); alertsById.set(a.id, a); refreshAll();
+    if (isNew) beep(a.severity === "critical" || a.kind === "sos");
+    if (a.kind === "sos" || a.kind === "women_safety_risk") {
+      toast((a.kind === "sos" ? "SOS: " : "Women’s safety alert: ") + a.summary, true);
       document.querySelector('.tab[data-tab="alerts"]').click();
     }
   }
-
-  const SEV_RANK = { critical: 0, urgent: 1, advisory: 2, info: 3 };
-
-  function renderAlertsList() {
-    const list = document.getElementById("alerts-list");
-    list.innerHTML = "";
-    let open = Array.from(alertsById.values()).filter((a) => a.status === "open" || a.status === "acknowledged");
-
-    if (safetyMode) {
-      // Surface SOS / women's-safety signals first without hiding anything
-      // else — a control room can't afford a mode that makes other live
-      // alerts disappear.
-      open.sort((a, b) => {
-        const aw = a.kind === "sos" || a.kind === "women_safety_risk" ? 0 : 1;
-        const bw = b.kind === "sos" || b.kind === "women_safety_risk" ? 0 : 1;
-        if (aw !== bw) return aw - bw;
-        return (SEV_RANK[a.severity] ?? 9) - (SEV_RANK[b.severity] ?? 9);
-      });
-    } else {
-      open.sort((a, b) => (SEV_RANK[a.severity] ?? 9) - (SEV_RANK[b.severity] ?? 9) || new Date(b.opened_at) - new Date(a.opened_at));
-    }
-
+  function refreshAll() { renderAlerts(); plotCameras(); renderCameraList(); updateStats(); }
+  function matchesFilter(a) {
+    if (alertFilter === "all") return true;
+    if (alertFilter === "watchlist") return ANPR_KINDS.has(a.kind);
+    if (alertFilter === "safety") return a.kind === "sos" || a.kind === "women_safety_risk";
+    if (alertFilter === "other") return !ANPR_KINDS.has(a.kind) && a.kind !== "sos" && a.kind !== "women_safety_risk";
+    return true;
+  }
+  function renderAlerts() {
+    const list = document.getElementById("alerts-list"); list.innerHTML = "";
+    let open = Array.from(alertsById.values()).filter((a) => (a.status === "open" || a.status === "acknowledged"));
     openAlertCount = open.length;
-    document.getElementById("alerts-count").textContent = String(openAlertCount);
-    updateStats();
-
+    const badge = document.getElementById("alerts-count"); badge.textContent = String(openAlertCount); badge.classList.toggle("zero", openAlertCount === 0);
+    open = open.filter(matchesFilter);
+    if (safetyMode) open.sort((a, b) => { const aw=(a.kind==="sos"||a.kind==="women_safety_risk")?0:1, bw=(b.kind==="sos"||b.kind==="women_safety_risk")?0:1; return aw-bw || (SEV_RANK[a.severity]??9)-(SEV_RANK[b.severity]??9); });
+    else open.sort((a, b) => (SEV_RANK[a.severity]??9)-(SEV_RANK[b.severity]??9) || new Date(b.opened_at)-new Date(a.opened_at));
     if (!open.length) {
-      list.innerHTML = window.SentinelAPI.getSession()
-        ? '<li class="empty-note">No open alerts.</li>'
-        : '<li class="empty-note">Sign in to see live alerts — the Live Events tab still shows the demo feed.</li>';
+      list.innerHTML = window.SentinelAPI.getSession() ? '<li class="empty-note">No open alerts.</li>' : '<li class="empty-note">Sign in to see live alerts.<br>Activity tab still shows the demo feed.</li>';
       return;
     }
-    for (const alert of open) list.appendChild(renderAlertItem(alert));
+    for (const a of open) list.appendChild(alertItem(a));
   }
-
-  function renderAlertItem(alert) {
-    const camera = cameras.find((c) => c.camera_id === alert.camera_id);
+  function alertItem(a) {
+    const c = cameras.find((x) => x.camera_id === a.camera_id);
     const li = document.createElement("li");
-    li.className = "feed-item sev-" + alert.severity + (alert.kind === "sos" ? " kind-sos" : "");
-    li.innerHTML =
-      '<div class="feed-head"><span class="feed-kind"></span><span class="status-pill st-' + alert.status + '"></span></div>' +
-      '<div class="feed-cam"></div><div class="feed-detail"></div><div class="feed-actions"></div>';
-    li.querySelector(".feed-kind").textContent = alert.kind.replace(/_/g, " ");
-    li.querySelector(".status-pill").textContent = alert.status.replace(/_/g, " ");
-    li.querySelector(".feed-cam").textContent =
-      (camera ? camera.code : alert.camera_id ? "camera " + alert.camera_id : "no camera") +
-      (alert.case_reference ? " · " + alert.case_reference : "");
-    li.querySelector(".feed-detail").textContent = alert.summary;
-
-    const actions = li.querySelector(".feed-actions");
-    if (alert.status === "open") {
-      const ackBtn = document.createElement("button");
-      ackBtn.className = "btn-mini"; ackBtn.textContent = "Acknowledge";
-      ackBtn.addEventListener("click", () => runAlertAction(ackBtn, () => window.SentinelAPI.acknowledgeAlert(alert.id)));
-      actions.appendChild(ackBtn);
-    }
-    if (alert.status === "open" || alert.status === "acknowledged") {
-      const closeBtn = document.createElement("button");
-      closeBtn.className = "btn-mini danger"; closeBtn.textContent = "Close";
-      closeBtn.addEventListener("click", () => runAlertAction(closeBtn, () => window.SentinelAPI.closeAlert(alert.id)));
-      actions.appendChild(closeBtn);
-    }
-    if (!actions.children.length) actions.remove();
+    li.className = "feed-item sev-" + a.severity + (a.kind === "sos" ? " kind-sos" : "");
+    li.innerHTML = '<div class="feed-head"><span class="feed-kind"></span><span class="status-pill st-' + a.status + '"></span></div><div class="feed-cam"></div><div class="feed-detail"></div><div class="feed-actions"></div>';
+    li.querySelector(".feed-kind").textContent = (a.kind || "").replace(/_/g, " ");
+    li.querySelector(".status-pill").textContent = a.status.replace(/_/g, " ");
+    li.querySelector(".feed-cam").textContent = (c ? c.name : (a.camera_id ? "camera " + a.camera_id : "no camera")) + (a.case_reference ? " · " + a.case_reference : "");
+    li.querySelector(".feed-detail").textContent = a.summary;
+    const act = li.querySelector(".feed-actions");
+    if (c && camLatLng(c)) act.appendChild(mini(t("showOnMap","Show on map"), "ghost", () => selectCamera(c.camera_id, true)));
+    if (ANPR_KINDS.has(a.kind) && a.detail && a.detail.entry_id) act.appendChild(mini(t("trackRoute","Track route"), "", () => { document.querySelector('.tab[data-tab="watchlist"]').click(); drawTrail(a.detail.entry_id, a.detail.plate_text || a.summary); }));
+    if (a.status === "open") act.appendChild(mini(t("dispatch","Dispatch"), "", (b) => dispatch(a, b)));
+    if (a.status === "open" || a.status === "acknowledged") act.appendChild(mini(t("close","Close"), "ghost", (b) => runAction(b, () => window.SentinelAPI.closeAlert(a.id))));
+    if (!act.children.length) act.remove();
     return li;
   }
-
-  async function runAlertAction(btn, action) {
-    btn.disabled = true;
-    try {
-      const updated = await action();
-      alertsById.set(updated.id, updated);
-      renderAlertsList();
-    } catch (err) {
-      toast("Action failed: " + err.message);
-      btn.disabled = false;
-    }
+  async function dispatch(a, btn) {
+    const unit = prompt("Dispatch to which unit / PCR? (recorded on the alert)", "PCR-");
+    if (unit === null) return;
+    btn.disabled = true; btn.textContent = "…";
+    try { const up = await window.SentinelAPI.acknowledgeAlert(a.id); handleAlert(up); toast("Acknowledged" + (unit ? " · dispatched to " + unit : "") + "."); }
+    catch (e) { toast("Dispatch failed: " + e.message); btn.disabled = false; }
   }
+  function mini(label, cls, fn) { const b = document.createElement("button"); b.className = "btn-mini" + (cls ? " " + cls : ""); b.textContent = label; b.addEventListener("click", () => fn(b)); return b; }
+  async function runAction(btn, fn) { btn.disabled = true; try { handleAlert(await fn()); } catch (e) { toast("Action failed: " + e.message); btn.disabled = false; } }
 
-  // ---------------------------------------------------------------------
-  // Watchlist — the searchable stolen-vehicle / wanted / missing / suspect
-  // database (Step 3), plus the "criminal mapping" trail per entry.
-  // ---------------------------------------------------------------------
-
+  // ---------------------------------------------------------------- watchlist + trail
   function wireWatchlist() {
-    const input = document.getElementById("wl-search-input");
-    const run = () => runWatchlistSearch(input.value.trim());
+    const input = document.getElementById("wl-search-input"), run = () => searchWatchlist(input.value.trim());
     document.getElementById("wl-search-btn").addEventListener("click", run);
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });
   }
-
-  async function runWatchlistSearch(query) {
-    const list = document.getElementById("wl-list");
-    if (!window.SentinelAPI.getSession()) {
-      list.innerHTML = '<li class="empty-note">Sign in to search the watchlist.</li>';
-      return;
-    }
-    list.innerHTML = '<li class="empty-note">Searching…</li>';
-    const entries = await window.SentinelAPI.searchWatchlist(query);
-    list.innerHTML = "";
-    if (!entries || !entries.length) {
-      list.innerHTML = '<li class="empty-note">No matching watchlist entries.</li>';
-      return;
-    }
-    for (const entry of entries) list.appendChild(renderWatchlistItem(entry));
+  async function searchWatchlist(q) {
+    const list = document.getElementById("wl-list"), hint = document.getElementById("wl-hint");
+    if (!window.SentinelAPI.getSession()) { hint.textContent = "Sign in to search the watchlist."; return; }
+    hint.textContent = ""; list.innerHTML = '<li class="empty-note">…</li>';
+    const entries = await window.SentinelAPI.searchWatchlist(q); list.innerHTML = "";
+    if (!entries || !entries.length) { list.innerHTML = '<li class="empty-note">No matching entries.</li>'; return; }
+    for (const e of entries) list.appendChild(wlItem(e));
   }
-
-  function renderWatchlistItem(entry) {
-    const li = document.createElement("li");
-    li.className = "wl-item";
-    li.innerHTML =
-      '<div class="wl-head"><span></span><span class="wl-risk risk-' + entry.risk_level + '"></span></div>' +
-      '<div class="wl-label"></div><div class="wl-case"></div><span class="wl-trail-link">View sighting trail →</span>';
-    li.querySelector(".wl-head span").outerHTML = entry.plate_number
-      ? '<span class="wl-plate">' + escapeHtml(entry.plate_number) + "</span>"
-      : "<span>" + escapeHtml(entry.entry_type.replace(/_/g, " ")) + "</span>";
-    li.querySelector(".wl-risk").textContent = entry.risk_level;
-    li.querySelector(".wl-label").textContent = entry.label;
+  function wlItem(entry) {
+    const li = document.createElement("li"); li.className = "wl-item";
+    const label = '<span class="wl-plate">' + esc(entry.plate_number || entry.entry_type.replace(/_/g, " ")) + '</span>';
+    li.innerHTML = '<div class="wl-head">' + label + '<span class="wl-risk risk-' + entry.risk_level + '">' + esc(entry.risk_level) + '</span></div><div class="wl-label"></div><div class="wl-case"></div>';
+    li.querySelector(".wl-label").textContent = entry.label || "";
     li.querySelector(".wl-case").textContent = entry.case_reference ? "Ref: " + entry.case_reference : entry.status;
-
-    li.querySelector(".wl-trail-link").addEventListener("click", async (e) => {
-      const el = e.target;
-      el.textContent = "Loading trail…";
-      try {
-        const trail = await window.SentinelAPI.fetchTrail(entry.id);
-        renderTrailBelow(li, trail);
-        el.remove();
-      } catch (err) {
-        el.textContent = "Trail unavailable";
-      }
-    });
+    const btn = mini(t("trackRouteMap","Track route on map"), "", () => drawTrail(entry.id, entry.plate_number || entry.label, li));
+    btn.classList.add("wl-route-btn"); li.appendChild(btn);
     return li;
   }
-
-  function renderTrailBelow(li, trail) {
-    const box = document.createElement("div");
-    box.style.marginTop = "8px";
-    box.style.paddingTop = "8px";
-    box.style.borderTop = "1px solid var(--line-solid)";
-    if (!trail.length) {
-      box.innerHTML = '<span style="color:var(--text-2)">No sightings recorded yet.</span>';
-    } else {
-      box.innerHTML = trail
-        .map((m) => {
-          const cam = cameras.find((c) => c.camera_id === m.camera_id);
-          return (
-            '<div style="margin-bottom:4px;color:var(--text-1)">' +
-            new Date(m.matched_at).toLocaleString("en-GB") +
-            " · " + (cam ? escapeHtml(cam.code) : "camera " + m.camera_id) +
-            " · " + Math.round((m.confidence || 0) * 100) + "% " + m.basis +
-            "</div>"
-          );
-        })
-        .join("");
+  async function drawTrail(entryId, label, li) {
+    try {
+      const trail = await window.SentinelAPI.fetchTrail(entryId);
+      if (!trail || !trail.length) { toast("No sightings recorded yet for this vehicle."); return; }
+      if (trailLayer) { map.removeLayer(trailLayer); trailLayer = null; }
+      trailLayer = L.layerGroup().addTo(map);
+      const pts = [];
+      trail.forEach((m, i) => {
+        const c = cameras.find((x) => x.camera_id === m.camera_id), ll = c ? camLatLng(c) : null; if (!ll) return;
+        pts.push(ll);
+        const last = i === trail.length - 1;
+        const icon = L.divIcon({ className: "", html: '<div class="trail-num' + (last ? " last" : "") + '">' + (i+1) + '</div>', iconSize: [24,24], iconAnchor: [12,12] });
+        L.marker(ll, { icon }).addTo(trailLayer).bindPopup('<b>' + esc(label || "vehicle") + '</b><div class="popup-sub">' + (c ? esc(c.name) : "camera") + '</div><div class="popup-sub">' + new Date(m.matched_at).toLocaleString("en-GB") + '</div>');
+      });
+      if (pts.length >= 2) L.polyline(pts, { color: "#3b82f6", weight: 3, opacity: 0.9, dashArray: "6 6" }).addTo(trailLayer);
+      if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.3));
+      const kin = kinematics(trail);
+      toast("Route drawn — " + trail.length + " sightings" + (kin.speed != null ? ", ~" + Math.round(kin.speed) + " km/h " + compass(kin.heading) : "") + ".");
+      if (li) readout(li, trail, kin);
+    } catch (e) { toast("Could not load route: " + e.message); }
+  }
+  function kinematics(trail) {
+    const cams = new Set(trail.filter((m) => m.camera_id != null).map((m) => m.camera_id)); let speed = null, heading = null;
+    for (let i = trail.length - 1; i > 0; i--) {
+      const b = trail[i], a = trail[i-1]; if (b.camera_id == null || a.camera_id == null || b.camera_id === a.camera_id) continue;
+      const cb = cameras.find((x) => x.camera_id === b.camera_id), ca = cameras.find((x) => x.camera_id === a.camera_id); if (!cb || !ca) continue;
+      const hrs = (new Date(b.matched_at) - new Date(a.matched_at)) / 3600000;
+      if (hrs > 0) speed = hav(camLatLng(ca), camLatLng(cb)) / hrs;
+      heading = brg(camLatLng(ca), camLatLng(cb)); break;
     }
+    return { hops: cams.size, speed, heading };
+  }
+  function readout(li, trail, kin) {
+    li.querySelectorAll(".wl-readout").forEach((n) => n.remove());
+    const box = document.createElement("div"); box.className = "wl-readout";
+    const rows = [["Sightings", String(trail.length)], ["Cameras (hops)", String(kin.hops)], ["Est. speed", kin.speed != null ? Math.round(kin.speed) + " km/h" : "—"], ["Est. heading", kin.heading != null ? Math.round(kin.heading) + "° " + compass(kin.heading) : "—"]];
+    box.innerHTML = rows.map(() => '<div class="r-row"><span></span><b></b></div>').join("");
+    box.querySelectorAll(".r-row").forEach((r, i) => { r.querySelector("span").textContent = rows[i][0]; r.querySelector("b").textContent = rows[i][1]; });
     li.appendChild(box);
   }
 
-  // ---------------------------------------------------------------------
-  // Stats
-  // ---------------------------------------------------------------------
-
+  // ---------------------------------------------------------------- stats
   function updateStats() {
-    document.getElementById("stat-cameras").textContent = String(cameras.length);
-    document.getElementById("stat-online").textContent = String(cameras.filter((c) => c.status === "active").length);
-    document.getElementById("stat-tracks").textContent = String(liveTracks.size);
-    const alertsEl = document.getElementById("stat-alerts");
-    alertsEl.textContent = String(openAlertCount);
-    alertsEl.classList.toggle("stat-hot", openAlertCount > 0);
+    document.getElementById("tel-cameras").textContent = String(cameras.length);
+    document.getElementById("tel-live").textContent = String(cameras.filter((c) => c.status === "active").length);
+    document.getElementById("tel-open").textContent = String(openAlertCount);
   }
-
-  // ---------------------------------------------------------------------
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  }
+  function initClock() { const el = document.getElementById("clock"); const tk = () => { el.textContent = new Date().toLocaleTimeString("en-GB"); }; tk(); setInterval(tk, 1000); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 })();

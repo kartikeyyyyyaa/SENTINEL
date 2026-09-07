@@ -27,8 +27,11 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from psycopg.errors import UniqueViolation
 
+from urllib.parse import quote
+
 from ..deps import AuthContext, get_auth_context
 from ..schemas import AlertIngest, AnalyticsEventIngest, WatchlistPullEntry, WatchlistPullResponse
+from ...config import get_settings
 from ...core.audit import AuditAction, record
 from ...core.broadcast import broadcaster
 from ...db import transaction
@@ -82,6 +85,74 @@ async def pull_watchlist(auth: AuthContext = Depends(get_auth_context)) -> Watch
     from datetime import datetime, timezone
 
     return WatchlistPullResponse(entries=entries, generated_at=datetime.now(timezone.utc))
+
+
+@router.get("/assignments")
+async def worker_assignments(auth: AuthContext = Depends(get_auth_context)) -> dict:
+    """The camera list an edge worker pulls on start and refresh.
+
+    ``services/analytics/config.load_cameras_from_registry`` calls exactly this
+    path. Every row it returns is parsed by ``CameraConfig.from_mapping``, which
+    ignores unknown keys and treats an empty ``rtsp_url`` as a stub camera — so
+    an unset grid credential degrades safely to synthetic frames rather than a
+    crash, which is the right behaviour on a network where the grid ports are
+    blocked.
+
+    **The RTSP credential is assembled here, never stored.** The government grid
+    authenticates every connection with the participant's registered email +
+    access password embedded in the URL (``rtsp://email:password@host:8554/...``),
+    with ``@`` percent-encoded. Those come from ``GRID_EMAIL`` / ``GRID_PASSWORD``
+    in this service's environment and are injected per request for the
+    authenticated worker; the camera row only ever holds the credential-free HLS
+    URL and the ``vms_camera_id`` the RTSP URL is built from.
+    """
+    if not (auth.security.has("camera.read_cross_department") or auth.security.has("watchlist.read")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="caller is not an analytics worker (needs camera.read_cross_department)",
+        )
+
+    settings = get_settings()
+    creds = ""
+    if settings.grid_email and settings.grid_password:
+        creds = f"{quote(settings.grid_email, safe='')}:{quote(settings.grid_password, safe='')}@"
+
+    with transaction(auth.security) as cur:
+        cur.execute(
+            """
+            SELECT id, name, camera_type, vms_camera_id, hls_url,
+                   ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon,
+                   jurisdiction_path
+            FROM   app.camera
+            WHERE  vms_platform = 'sentinel_grid' AND status = 'active'
+            ORDER BY id
+            """
+        )
+        rows = cur.fetchall()
+
+    cameras = []
+    for r in rows:
+        rtsp_url = ""
+        if creds and r["vms_camera_id"]:
+            rtsp_url = (
+                f"rtsp://{creds}{settings.grid_stream_host}:{settings.grid_rtsp_port}"
+                f"/stream/{r['vms_camera_id']}"
+            )
+        cameras.append(
+            {
+                "id": r["id"],
+                "camera_id": r["id"],
+                "name": r["name"],
+                "camera_type": r["camera_type"],
+                "vms_camera_id": r["vms_camera_id"],
+                "rtsp_url": rtsp_url,
+                "hls_url": r["hls_url"],
+                "lat": r["lat"],
+                "lon": r["lon"],
+                "jurisdiction_path": r["jurisdiction_path"],
+            }
+        )
+    return {"cameras": cameras, "count": len(cameras), "streams_authenticated": bool(creds)}
 
 
 @router.post("/alerts", status_code=status.HTTP_202_ACCEPTED)

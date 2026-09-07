@@ -3,33 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sentinel Operator Console</title>
+  <meta name="description" content="Sentinel operator console — live Gujarat CCTV grid, watchlist alerts and cross-camera vehicle tracking for police control rooms.">
+  <meta name="theme-color" content="#0a0f1c">
+  <title>Sentinel — Control Room</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="vendor/leaflet-cluster/MarkerCluster.css">
+  <link rel="stylesheet" href="vendor/leaflet-cluster/MarkerCluster.Default.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <a href="#map" class="skip-link" data-i18n="skipToMap">Skip to map</a>
   <div id="app">
 
-    <header id="topbar">
+    <header id="topbar" role="banner">
       <div class="brand">
-        <span class="brand-mark">&#9673;</span>
-        <span class="brand-name">SENTINEL</span>
-        <span class="brand-sub">Operator Console</span>
-      </div>
-
-      <div class="topbar-stats" id="topbar-stats">
-        <div class="stat"><span class="stat-value" id="stat-cameras">&mdash;</span><span class="stat-label">cameras</span></div>
-        <div class="stat"><span class="stat-value" id="stat-online">&mdash;</span><span class="stat-label">online</span></div>
-        <div class="stat"><span class="stat-value" id="stat-tracks">&mdash;</span><span class="stat-label">active tracks</span></div>
-        <div class="stat"><span class="stat-value" id="stat-alerts">&mdash;</span><span class="stat-label">open alerts</span></div>
+        <span class="brand-title">SENTINEL <span class="slash">//</span> Control Room</span>
+        <span class="brand-sub">Gujarat Police &middot; live CCTV grid</span>
       </div>
 
       <div class="topbar-right">
-        <button id="safety-toggle" class="toggle-safety" type="button" title="Highlight isolated/high-risk zones and surface women's-safety alerts first">
-          <span class="switch"></span><span>Women&rsquo;s Safety Mode</span>
+        <select id="lang-select" class="lang-select" title="Language">
+          <option value="en">EN</option>
+          <option value="gu">ગુજરાતી</option>
+          <option value="hi">हिंदी</option>
+        </select>
+        <button id="wall-btn" class="topbar-btn" type="button" data-i18n="videoWall">Video wall</button>
+        <button id="safety-toggle" class="toggle-safety" type="button" title="Prioritise women's-safety alerts and highlight high-risk zones">
+          <span class="switch"></span><span data-i18n="womenSafety">Women&rsquo;s Safety</span>
         </button>
-        <button id="sos-btn" class="btn-sos" type="button" title="Report a women's-safety SOS (see api/routers/alerts.py — no login required for a real one)">SOS</button>
-        <span id="data-mode" class="badge badge-demo" title="Where camera and event data is coming from"><span class="badge-dot"></span>DEMO DATA</span>
+        <button id="sos-btn" class="btn-sos" type="button" title="Raise a women's-safety SOS">SOS</button>
+        <span id="data-mode" class="badge badge-demo"><span class="badge-dot"></span>DEMO DATA</span>
         <span class="clock" id="clock">--:--:--</span>
         <button id="user-chip" class="user-chip" type="button" hidden>
           <span class="avatar" id="user-avatar">&mdash;</span>
@@ -40,53 +44,70 @@
 
     <div id="layout">
 
-      <aside id="sidebar">
+      <aside id="sidebar" role="complementary" aria-label="Camera list">
         <div class="panel-head">
-          <h2>Cameras</h2>
-          <input id="camera-search" type="search" placeholder="Search code, name, ward&hellip;" autocomplete="off">
+          <h2 data-i18n="cameras">Cameras</h2>
+          <span class="count-pill" id="cam-count">&mdash;</span>
         </div>
-        <div class="filter-row" id="status-filters">
-          <button class="chip chip-active" data-status="all">All</button>
-          <button class="chip" data-status="active">Active</button>
-          <button class="chip" data-status="faulty">Faulty</button>
-          <button class="chip" data-status="maintenance">Maint.</button>
-          <button class="chip" data-status="inactive">Offline</button>
+        <div class="sidebar-controls">
+          <label for="camera-search" class="sr-only" data-i18n="searchCameras">Search name, code or district&hellip;</label>
+          <input id="camera-search" type="search" data-i18n-ph="searchCameras" placeholder="Search name, code or district&hellip;" autocomplete="off">
+          <div class="filter-row" id="status-filters" role="group" aria-label="Filter cameras by status">
+            <button class="chip chip-active" data-status="all" data-i18n="all" aria-pressed="true">All</button>
+            <button class="chip" data-status="active" data-i18n="live" aria-pressed="false">Live</button>
+            <button class="chip" data-status="faulty" data-i18n="faulty" aria-pressed="false">Faulty</button>
+            <button class="chip" data-status="inactive" data-i18n="offline" aria-pressed="false">Offline</button>
+          </div>
         </div>
-        <ul id="camera-list" class="camera-list"></ul>
+        <ul id="camera-list" class="camera-list" aria-busy="true">
+          <li class="skeleton-row" aria-hidden="true"></li>
+          <li class="skeleton-row" aria-hidden="true"></li>
+          <li class="skeleton-row" aria-hidden="true"></li>
+          <li class="skeleton-row" aria-hidden="true"></li>
+          <li class="skeleton-row" aria-hidden="true"></li>
+        </ul>
       </aside>
 
       <main id="map-wrap">
-        <div id="map"></div>
-        <div id="radar-sweep"></div>
-        <div id="map-toast"></div>
-        <div id="map-legend">
-          <div class="legend-row"><span class="dot dot-active"></span>active</div>
-          <div class="legend-row"><span class="dot dot-faulty"></span>faulty</div>
-          <div class="legend-row"><span class="dot dot-maintenance"></span>maintenance</div>
-          <div class="legend-row"><span class="dot dot-inactive"></span>offline</div>
+        <div id="map" role="region" aria-label="Map of Gujarat showing camera locations"></div>
+        <div id="map-toast" role="alert" aria-live="assertive"></div>
+        <div id="map-legend" aria-label="Map legend">
+          <div class="legend-row"><span class="pin pin-active"></span><span data-i18n="live">live</span></div>
+          <div class="legend-row"><span class="pin pin-alert"></span><span data-i18n="activeAlert">active alert</span></div>
+          <div class="legend-row"><span class="pin pin-faulty"></span><span data-i18n="faulty">faulty</span></div>
+          <div class="legend-row"><span class="pin pin-inactive"></span><span data-i18n="offline">offline</span></div>
         </div>
+        <button id="reset-view" class="map-btn" type="button" data-i18n="fitAll">Fit all cameras</button>
       </main>
 
-      <aside id="side-panel">
-        <div class="tabs" id="panel-tabs">
-          <button class="tab tab-active" data-tab="alerts">Alerts <span id="alerts-count" class="tab-count">0</span></button>
-          <button class="tab" data-tab="watchlist">Watchlist</button>
-          <button class="tab" data-tab="events">Live Events</button>
+      <aside id="side-panel" role="complementary" aria-label="Alerts, watchlist and activity">
+        <div class="tabs" id="panel-tabs" role="tablist">
+          <button class="tab tab-active" data-tab="alerts" role="tab" aria-selected="true"><span data-i18n="alerts">Alerts</span> <span id="alerts-count" class="tab-count" aria-live="polite">0</span></button>
+          <button class="tab" data-tab="watchlist" data-i18n="trackVehicle" role="tab" aria-selected="false">Track a vehicle</button>
+          <button class="tab" data-tab="events" data-i18n="activity" role="tab" aria-selected="false">Activity</button>
         </div>
 
-        <div id="tab-alerts" class="tab-body tab-body-active">
+        <div id="tab-alerts" class="tab-body tab-body-active" role="tabpanel">
+          <div class="alert-filters" id="alert-filters" role="group" aria-label="Filter alerts by type">
+            <button class="fchip fchip-active" data-filter="all" data-i18n="all" aria-pressed="true">All</button>
+            <button class="fchip" data-filter="watchlist" data-i18n="watchlistF" aria-pressed="false">Watchlist</button>
+            <button class="fchip" data-filter="safety" data-i18n="safetyF" aria-pressed="false">Women&rsquo;s safety</button>
+            <button class="fchip" data-filter="other" data-i18n="otherF" aria-pressed="false">Other</button>
+          </div>
           <ul id="alerts-list" class="feed-list"></ul>
         </div>
 
-        <div id="tab-watchlist" class="tab-body">
+        <div id="tab-watchlist" class="tab-body" role="tabpanel">
           <div class="wl-search">
-            <input id="wl-search-input" type="search" placeholder="Plate, name or case ref&hellip;" autocomplete="off">
-            <button id="wl-search-btn" type="button">Search</button>
+            <label for="wl-search-input" class="sr-only" data-i18n="searchWatchlist">Plate, name or case reference&hellip;</label>
+            <input id="wl-search-input" type="search" data-i18n-ph="searchWatchlist" placeholder="Plate, name or case reference&hellip;" autocomplete="off">
+            <button id="wl-search-btn" type="button" data-i18n="search">Search</button>
           </div>
+          <div id="wl-hint" class="wl-hint" data-i18n="wlHint">Search the watchlist, then open a vehicle to see its route across cameras on the map.</div>
           <ul id="wl-list" class="wl-list"></ul>
         </div>
 
-        <div id="tab-events" class="tab-body">
+        <div id="tab-events" class="tab-body" role="tabpanel">
           <ul id="events-list" class="feed-list"></ul>
         </div>
       </aside>
@@ -94,51 +115,93 @@
     </div>
 
     <footer id="statusbar">
-      <span id="footer-note">Metadata only &mdash; no video crosses this console. See services/analytics for the edge pipeline that produces these events.</span>
+      <span class="tel-item"><span class="tel-dot" id="tel-dot"></span><span id="tel-mode">Demo data</span></span>
+      <span class="tel-item"><b id="tel-cameras">&mdash;</b> <span data-i18n="cameras">cameras</span></span>
+      <span class="tel-item"><b id="tel-live">&mdash;</b> <span data-i18n="live">live</span></span>
+      <span class="tel-item"><b id="tel-open">&mdash;</b> <span data-i18n="openAlerts">open alerts</span></span>
+      <span id="footer-note" data-i18n="metaNote">Edge analytics are metadata-only &middot; live video on demand.</span>
+      <button id="privacy-btn" class="footer-link" type="button" data-i18n="dataPrivacy">Data &amp; Privacy</button>
     </footer>
 
   </div>
 
-  <div id="camera-detail" class="drawer" hidden>
+  <div id="camera-detail" class="drawer" hidden role="dialog" aria-modal="true" aria-labelledby="cd-title">
     <div class="drawer-head">
       <h3 id="cd-title">&mdash;</h3>
       <button id="cd-close" class="icon-btn" aria-label="Close">&times;</button>
     </div>
+    <div class="drawer-video" id="cd-video">
+      <div class="cd-video-frame">
+        <video id="cd-player" class="cd-player" playsinline muted controls></video>
+        <div id="cd-video-spinner" class="video-spinner" hidden aria-hidden="true"></div>
+      </div>
+      <div id="cd-video-msg" class="cd-video-msg" aria-live="polite"></div>
+    </div>
     <div class="drawer-body" id="cd-body"></div>
   </div>
 
-  <div id="login-overlay">
+  <div id="wall-overlay" class="wall-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="wall-title-el">
+    <div class="wall-head">
+      <span class="wall-title" id="wall-title-el" data-i18n="videoWall">Video wall</span>
+      <span class="wall-sub" id="wall-sub"></span>
+      <button id="wall-close" class="icon-btn" aria-label="Close">&times;</button>
+    </div>
+    <div id="wall-grid" class="wall-grid"></div>
+  </div>
+
+  <div id="login-overlay" role="dialog" aria-modal="true" aria-labelledby="login-brand-el">
     <div class="login-card">
-      <div class="login-brand"><span class="brand-mark">&#9673;</span><span class="brand-name">SENTINEL</span></div>
-      <div class="login-sub">Sign in to the operator console</div>
-      <form id="login-form">
+      <div class="login-brand" id="login-brand-el">SENTINEL <span class="slash">//</span> Control Room</div>
+      <div class="login-sub" data-i18n="signInSub">Sign in to the operator console</div>
+      <form id="login-form" novalidate>
         <div class="login-field">
-          <label for="login-username">Username</label>
-          <input id="login-username" type="text" autocomplete="username" required>
+          <label for="login-username" data-i18n="username">Username</label>
+          <input id="login-username" type="text" autocomplete="username" aria-describedby="login-username-err" required>
+          <div id="login-username-err" class="field-error" aria-live="polite"></div>
         </div>
         <div class="login-field">
-          <label for="login-password">Password</label>
-          <input id="login-password" type="password" autocomplete="current-password" required>
+          <label for="login-password" data-i18n="password">Password</label>
+          <input id="login-password" type="password" autocomplete="current-password" aria-describedby="login-password-err" required>
+          <div id="login-password-err" class="field-error" aria-live="polite"></div>
         </div>
-        <button id="login-submit" class="login-submit" type="submit">Sign in</button>
-        <div id="login-error" class="login-error"></div>
+        <button id="login-submit" class="login-submit" type="submit" data-i18n="signIn">Sign in</button>
+        <div id="login-error" class="login-error" aria-live="polite"></div>
       </form>
-      <a id="login-demo" class="login-demo">Continue without signing in &mdash; demo data only &rarr;</a>
+      <a id="login-demo" class="login-demo" data-i18n="continueDemo">Continue without signing in &mdash; demo data only &rarr;</a>
     </div>
   </div>
 
-  <div id="sos-modal" class="modal-backdrop" hidden>
+  <div id="sos-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="sos-title-el">
     <div class="modal-card">
-      <h3>Report SOS</h3>
-      <p>This sends a real, unauthenticated panic signal to <code>POST /api/sos</code> &mdash; exactly what a kiosk or the mobile app would send. It opens a critical alert immediately, with no login required. Use this to demo the women&rsquo;s-safety response path.</p>
+      <h3 id="sos-title-el" data-i18n="raiseSos">Raise an SOS</h3>
+      <p data-i18n="sosBody">This sends a real women&rsquo;s-safety panic signal and opens a critical alert immediately &mdash; no login required, exactly as a public kiosk or the mobile app would send it.</p>
       <div class="modal-actions">
-        <button id="sos-cancel" class="modal-cancel" type="button">Cancel</button>
-        <button id="sos-confirm" class="modal-confirm" type="button">Send SOS</button>
+        <button id="sos-cancel" class="modal-cancel" type="button" data-i18n="cancel">Cancel</button>
+        <button id="sos-confirm" class="modal-confirm" type="button" data-i18n="sendSos">Send SOS</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="privacy-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="privacy-title-el">
+    <div class="modal-card modal-card-wide">
+      <h3 id="privacy-title-el" data-i18n="privacyTitle">Data &amp; Privacy</h3>
+      <div class="privacy-body">
+        <h4 data-i18n="privacyH1">What is collected, and why</h4>
+        <p><span data-i18n="privacyP1">Camera metadata, number-plate reads and watchlist matches are logged against a stated purpose and case reference. Raw video is never stored by Sentinel — it is only ever proxied live, on demand.</span> <span class="privacy-ref"><span data-i18n="privacyRef">Full detail:</span> <code>docs/DATA_HANDLING_AND_RETENTION.md</code></span></p>
+        <h4 data-i18n="privacyH2">Automated matching</h4>
+        <p><span data-i18n="privacyP2">Plate and face matching are automated; opening an alert is automated. Dispatching, closing or acting on an alert is always a human decision, recorded under the operator&rsquo;s own identity.</span> <span class="privacy-ref"><span data-i18n="privacyRef">Full detail:</span> <code>docs/AUTOMATED_PROCESSING_DISCLOSURE.md</code></span></p>
+        <h4 data-i18n="privacyH3">Access control &amp; audit</h4>
+        <p><span data-i18n="privacyP3">Every access is scoped by jurisdiction at the database level and written to an append-only, tamper-evident audit trail.</span> <span class="privacy-ref"><span data-i18n="privacyRef">Full detail:</span> <code>docs/SECURITY.md</code></span></p>
+      </div>
+      <div class="modal-actions">
+        <button id="privacy-close" class="modal-cancel" type="button" data-i18n="close">Close</button>
       </div>
     </div>
   </div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/leaflet-cluster/markercluster.js"></script>
+  <script src="vendor/hls/hls.min.js"></script>
   <script src="api.js"></script>
   <script src="app.js"></script>
 </body>
