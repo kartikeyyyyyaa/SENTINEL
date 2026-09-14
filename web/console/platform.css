@@ -1,0 +1,150 @@
+/* platform.css — shared chrome for every page that isn't the live console
+ * itself: the top platform nav, the landing page, the login page, and the
+ * Camera Health / Incident Reports / Safety Map dashboards. Loaded after
+ * theme.css (tokens/fonts) and, on the console, after style.css too — the
+ * console keeps its own topbar and just mounts the platform nav strip above
+ * it as a slim addition (see #platform-nav in index.html).
+ */
+
+body { font-family: var(--font-body); }
+h1, h2, h3, .stat-value, .pnav-title, .brand-title { font-family: var(--font-display); }
+
+/* ---------- platform nav (nav.js renders into #platform-nav) ---------- */
+.pnav { display: flex; align-items: center; gap: 22px; padding: 10px 22px; background: var(--bg-2);
+  border-bottom: 1px solid var(--line-soft); position: relative;
+  /* Above the console's own sign-in overlay (style.css, z-index 2000) so a
+     visitor who lands on index.html directly can still reach the other
+     pages — landing, login.html, Camera Health, etc. — without dismissing
+     it first. */
+  z-index: 2100; }
+.pnav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; flex: 0 0 auto; }
+.pnav-logo { width: 30px; height: 30px; display: block; }
+.pnav-title { font-size: 16px; font-weight: 700; letter-spacing: 0.02em; color: var(--text-0); white-space: nowrap; }
+.pnav-title .pnav-slash { color: var(--blue); }
+.pnav-title .pnav-sub { color: var(--text-1); font-weight: 600; }
+.pnav-links { display: flex; gap: 4px; flex-wrap: wrap; }
+.pnav-link { color: var(--text-1); text-decoration: none; font-size: 13px; font-weight: 600;
+  padding: 7px 13px; border-radius: 8px; }
+.pnav-link:hover { color: var(--text-0); background: var(--card); }
+.pnav-link.pnav-active { color: #fff; background: var(--blue); }
+.pnav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.pnav-user { font-size: 12.5px; color: var(--text-1); }
+.pnav-signin { color: #fff; background: var(--blue); text-decoration: none; font-size: 12.5px; font-weight: 700;
+  padding: 7px 14px; border-radius: 8px; }
+.pnav-signin:hover { filter: brightness(1.1); }
+.pnav-theme { background: var(--card); border: 1px solid var(--line-soft); color: var(--text-1);
+  font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: pointer; }
+.pnav-theme:hover { color: var(--text-0); border-color: var(--blue); }
+.pnav-toggle { display: none; }
+
+@media (max-width: 860px) {
+  .pnav { flex-wrap: wrap; }
+  .pnav-links { order: 3; width: 100%; }
+}
+
+/* ---------- tricolour accent strip — one line, branded pages only ---------- */
+.tricolor-strip { height: 3px; display: flex; }
+.tricolor-strip span { flex: 1; }
+.tricolor-strip span:nth-child(1) { background: var(--tricolor-saffron); }
+.tricolor-strip span:nth-child(2) { background: var(--tricolor-white); }
+.tricolor-strip span:nth-child(3) { background: var(--tricolor-green); }
+
+/* ---------- generic dashboard page shell ---------- */
+.page-shell { max-width: 1280px; margin: 0 auto; padding: 28px 24px 60px; }
+.page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  margin-bottom: 24px; flex-wrap: wrap; }
+.page-header h1 { margin: 0; font-size: 26px; font-weight: 700; color: var(--text-0); letter-spacing: 0.01em; }
+.page-header p { margin: 6px 0 0; color: var(--text-2); font-size: 13.5px; max-width: 640px; line-height: 1.5; }
+.page-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.badge-note { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; }
+.badge-note.demo { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.35); }
+.badge-note.live { background: rgba(34,197,94,0.13); color: var(--green); border: 1px solid rgba(34,197,94,0.4); }
+.badge-note.curated { background: rgba(59,130,246,0.13); color: var(--blue-bright); border: 1px solid rgba(59,130,246,0.35); }
+
+/* ---------- buttons ---------- */
+.btn { font-family: var(--font-body); font-size: 13px; font-weight: 700; padding: 9px 17px; border-radius: 8px;
+  cursor: pointer; border: 1px solid transparent; text-decoration: none; display: inline-flex; align-items: center; gap: 7px; }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-ghost { background: var(--card); border-color: var(--line-soft); color: var(--text-1); }
+.btn-ghost:hover { color: var(--text-0); border-color: var(--blue); }
+.btn-danger { background: transparent; border-color: rgba(239,68,68,0.4); color: var(--red); }
+.btn-danger:hover { background: rgba(239,68,68,0.1); }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.btn-ghost.btn-active { border-color: var(--blue); color: var(--text-0); background: var(--blue-dim); }
+
+/* ---------- stat tiles ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 26px; }
+.stat-card { background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 16px 18px; }
+.stat-card .stat-label { font-size: 11.5px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-card .stat-value { font-size: 30px; font-weight: 700; color: var(--text-0); margin-top: 4px; line-height: 1.1;
+  font-variant-numeric: tabular-nums; }
+.stat-card .stat-sub { font-size: 12px; color: var(--text-1); margin-top: 4px; }
+.stat-card.stat-warn .stat-value { color: var(--amber); }
+.stat-card.stat-bad .stat-value { color: var(--red); }
+.stat-card.stat-good .stat-value { color: var(--green); }
+
+/* ---------- section cards ---------- */
+.panel-card { background: var(--panel); border: 1px solid var(--line-soft); border-radius: var(--radius);
+  padding: 18px 20px; margin-bottom: 20px; }
+.panel-card h2 { margin: 0 0 4px; font-size: 16px; color: var(--text-0); }
+.panel-card .panel-sub { color: var(--text-2); font-size: 12.5px; margin: 0 0 14px; }
+
+/* ---------- data table ---------- */
+.data-table-wrap { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 12.8px; }
+.data-table th { text-align: left; color: var(--text-2); font-weight: 600; font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+.data-table td { padding: 9px 12px; border-bottom: 1px solid var(--line-soft); color: var(--text-1); vertical-align: middle; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--card-2); }
+.status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px; }
+.status-chip .dot { width: 7px; height: 7px; border-radius: 50%; }
+.status-chip.status-active { color: var(--green); background: rgba(34,197,94,0.1); }
+.status-chip.status-active .dot { background: var(--green); }
+.status-chip.status-faulty, .status-chip.status-maintenance { color: var(--amber); background: rgba(245,158,11,0.1); }
+.status-chip.status-faulty .dot, .status-chip.status-maintenance .dot { background: var(--amber); }
+.status-chip.status-inactive, .status-chip.status-decommissioned, .status-chip.status-planned {
+  color: var(--text-2); background: rgba(100,128,160,0.12); }
+.status-chip.status-inactive .dot, .status-chip.status-decommissioned .dot, .status-chip.status-planned .dot { background: var(--text-2); }
+
+.risk-pill { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 3px 9px; border-radius: 999px; }
+.risk-pill.risk-low { color: var(--text-1); border: 1px solid var(--line-soft); }
+.risk-pill.risk-medium { color: var(--amber); border: 1px solid rgba(245,158,11,0.4); }
+.risk-pill.risk-high { color: var(--sev-urgent); border: 1px solid rgba(251,146,60,0.45); }
+.risk-pill.risk-critical { color: var(--red); border: 1px solid rgba(239,68,68,0.45); }
+
+.empty-state { text-align: center; color: var(--text-2); padding: 40px 20px; font-size: 13.5px; line-height: 1.6; }
+
+/* ---------- form controls (shared by login and safety-zone forms) ---------- */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-2); margin-bottom: 6px; }
+.field input, .field select, .field textarea { width: 100%; background: var(--bg-2); border: 1px solid var(--line-soft);
+  color: var(--text-0); border-radius: 8px; padding: 10px 12px; font-size: 14px; font-family: var(--font-body); }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+.field-error { color: var(--red); font-size: 11.5px; margin-top: 5px; min-height: 14px; line-height: 1.35; }
+
+@media (max-width: 640px) {
+  .page-shell { padding: 20px 14px 40px; }
+  .page-header h1 { font-size: 21px; }
+}
+
+/* ---------- light-page overrides (public landing + login) ----------
+ * On the light pages the single call-to-action colour is orange, exactly
+ * like the official site's "Register" button. The nav sign-in and any
+ * .btn-primary become orange; the nav gets a soft shadow instead of the
+ * dark border it carries on the console. */
+body.theme-light .pnav { border-bottom: 1px solid var(--line); box-shadow: 0 1px 0 rgba(19,41,74,0.04); }
+body.theme-light .pnav-link:hover { background: var(--card-2); }
+body.theme-light .pnav-link.pnav-active { background: var(--blue); color: #fff; }
+body.theme-light .pnav-signin { background: var(--orange); color: var(--orange-ink); }
+body.theme-light .btn-primary { background: var(--orange); color: var(--orange-ink); }
+body.theme-light .btn-ghost { background: #fff; }
+body.theme-light .field input:focus, body.theme-light .field select:focus, body.theme-light .field textarea:focus {
+  border-color: var(--orange); box-shadow: 0 0 0 3px rgba(242,101,34,0.15); }

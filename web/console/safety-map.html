@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sentinel Safety Map — police-curated women's-safety zones across Gujarat, shown alongside the live CCTV grid.">
+  <meta name="theme-color" content="#0a0f1c">
+  <title>Safety Map — Sentinel</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="platform.css">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="safety-map.css">
+</head>
+<body class="theme-light">
+  <a href="#main" class="skip-link">Skip to content</a>
+  <div id="platform-nav"></div>
+
+  <main id="main" class="page-shell">
+    <div class="page-header">
+      <div>
+        <h1>Women&rsquo;s Safety Map</h1>
+        <p>Areas flagged by police judgement for extra caution or patrol attention. These zones are curated by
+          officers &mdash; not generated from crime statistics or an algorithm &mdash; and are reviewed and
+          updated by state or district administrators.</p>
+      </div>
+      <div class="page-actions">
+        <span id="data-badge" class="badge-note curated">Curated</span>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Zones</div>
+        <div class="stat-value" id="stat-zones">&mdash;</div>
+      </div>
+      <div class="stat-card stat-bad">
+        <div class="stat-label">High / critical</div>
+        <div class="stat-value" id="stat-high">&mdash;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Districts covered</div>
+        <div class="stat-value" id="stat-districts">&mdash;</div>
+      </div>
+    </div>
+
+    <div class="safety-layout">
+      <div class="panel-card safety-map-panel">
+        <h2>Map</h2>
+        <p class="panel-sub">Circle size shows the flagged radius; colour shows risk level.</p>
+        <div id="safety-map" class="safety-map-canvas"></div>
+        <div class="safety-legend">
+          <span><i class="dot dot-low"></i>Low</span>
+          <span><i class="dot dot-medium"></i>Medium</span>
+          <span><i class="dot dot-high"></i>High</span>
+          <span><i class="dot dot-critical"></i>Critical</span>
+        </div>
+      </div>
+
+      <div class="safety-side">
+        <div class="panel-card">
+          <h2>Zones</h2>
+          <p class="panel-sub">All curated zones visible to you.</p>
+          <ul id="zone-list" class="zone-list"></ul>
+          <div id="zone-empty" class="empty-state" hidden>No zones curated yet.</div>
+        </div>
+
+        <div class="panel-card" id="add-zone-panel" hidden>
+          <h2>Add a zone</h2>
+          <p class="panel-sub">Click the map to set the location, then fill in the details. Requires state or
+            district administrator access.</p>
+          <form id="zone-form">
+            <div class="field">
+              <label for="zf-name">Name</label>
+              <input id="zf-name" type="text" required maxlength="200" placeholder="e.g. Railway station approach">
+            </div>
+            <div class="field field-row">
+              <div>
+                <label for="zf-lat">Latitude</label>
+                <input id="zf-lat" type="number" step="0.0001" min="-90" max="90" required>
+              </div>
+              <div>
+                <label for="zf-lon">Longitude</label>
+                <input id="zf-lon" type="number" step="0.0001" min="-180" max="180" required>
+              </div>
+            </div>
+            <div class="field field-row">
+              <div>
+                <label for="zf-radius">Radius (metres)</label>
+                <input id="zf-radius" type="number" step="10" min="10" max="5000" value="300" required>
+              </div>
+              <div>
+                <label for="zf-risk">Risk level</label>
+                <select id="zf-risk">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="zf-jurisdiction">Jurisdiction ID</label>
+              <input id="zf-jurisdiction" type="number" min="1" required placeholder="See your department's jurisdiction list">
+            </div>
+            <div class="field">
+              <label for="zf-note">Note (optional)</label>
+              <textarea id="zf-note" rows="2" maxlength="2000" placeholder="Why this area is flagged&hellip;"></textarea>
+            </div>
+            <button class="btn btn-primary" type="submit">Add zone</button>
+            <div id="zf-error" class="field-error" aria-live="polite"></div>
+          </form>
+        </div>
+
+        <div class="panel-card" id="signin-prompt">
+          <h2>Want to curate zones?</h2>
+          <p class="panel-sub">Sign in with a state or district administrator account to add or remove zones.</p>
+          <a class="btn btn-ghost" href="login.html">Sign in</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="api.js"></script>
+  <script src="nav.js"></script>
+  <script src="safety-map.js"></script>
+</body>
+</html>

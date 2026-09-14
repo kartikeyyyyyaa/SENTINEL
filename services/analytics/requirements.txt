@@ -1,0 +1,38 @@
+# Split into two tiers deliberately. The first tier is what the worker needs to
+# start, self-test and run its dry run; the second is what it needs to analyse real
+# video. Every import of the second tier is lazy, inside the function or __init__
+# that uses it, so a machine with only the first tier still runs the unit tests and
+# the --dry-run pipeline end to end. That is not a convenience: the development
+# machines for this project have no GPU, and a module-level torch import would make
+# this service untestable on them.
+
+# --- Tier 1: required. Nothing here needs a GPU or model weights. ---
+numpy>=1.26,<3.0
+
+# --- Tier 2: required only to analyse real streams. Imported lazily. ---
+# RTSP capture and image ops. opencv-python-headless, not opencv-python: the edge
+# box has no display and the GUI variant drags in GTK/Qt for nothing.
+opencv-python-headless>=4.10,<6.0
+# Detection. Pretrained COCO weights, used as shipped — nothing in this project is
+# trained. Export to int8 ONNX before deployment; see the README.
+ultralytics>=8.3,<9.0
+# Plate OCR. paddlepaddle is the runtime paddleocr needs and does not pull in
+# itself on every platform, so it is pinned here explicitly rather than left to
+# fail at first inference.
+paddleocr>=2.9,<4.0
+paddlepaddle>=2.6,<4.0
+# Person-watchlist face embedding. Only imported when ANALYTICS_FACE=insightface;
+# see stages/face.py. Left uninstalled by default like the rest of tier 2 — the
+# stub backend (default) proves the watchlist-matching pipeline end to end with
+# neither of these installed.
+# insightface>=0.7,<1.0
+# onnxruntime>=1.19,<2.0
+
+# Not listed on purpose:
+#   requests / httpx  - sink.py uses urllib from the stdlib. One less wheel that
+#                       can fail to install on an edge box.
+#   pytest            - the tests are stdlib unittest, runnable with nothing
+#                       installed beyond tier 1. Run them with:
+#                           python -m unittest discover -s tests -t . -v
+#   torch             - pulled in by ultralytics, whose own pin is more reliable
+#                       than ours would be across CPU and CUDA builds.

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img">
+  <title>Placeholder crest — replace with the official Gujarat Police emblem</title>
+  <defs>
+    <linearGradient id="shieldGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2a47"/>
+      <stop offset="1" stop-color="#0d1526"/>
+    </linearGradient>
+  </defs>
+  <path d="M50 4 L90 18 V46 C90 70 73 87 50 96 C27 87 10 70 10 46 V18 Z"
+        fill="url(#shieldGrad)" stroke="#5b9dff" stroke-width="2.5"/>
+  <path d="M50 12 L82 24 V46 C82 65.5 68 80 50 88 C32 80 18 65.5 18 46 V24 Z"
+        fill="none" stroke="#3b82f6" stroke-width="1.2" opacity="0.6"/>
+  <path d="M50 24 L61 30 L61 44 C61 54 56 61 50 65 C44 61 39 54 39 44 L39 30 Z"
+        fill="#5b9dff" opacity="0.9"/>
+  <path d="M50 30 L50 58 M42 40 L58 40" stroke="#0a0f1c" stroke-width="2" stroke-linecap="round"/>
+  <text x="50" y="80" text-anchor="middle" font-family="'Rajdhani', sans-serif" font-weight="700"
+        font-size="11" letter-spacing="1.5" fill="#eaf1fb">GUJARAT</text>
+</svg>

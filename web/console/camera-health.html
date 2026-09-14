@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sentinel Camera Health — which cameras in the Gujarat CCTV grid are live, faulty or unreachable, and when each was last checked.">
+  <meta name="theme-color" content="#0a0f1c">
+  <title>Camera Health — Sentinel</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="platform.css">
+</head>
+<body class="theme-light">
+  <a href="#main" class="skip-link">Skip to content</a>
+  <div id="platform-nav"></div>
+
+  <main id="main" class="page-shell">
+    <div class="page-header">
+      <div>
+        <h1>Camera Health</h1>
+        <p>Live status for every camera visible to your jurisdiction, with the last time it was actually
+          checked. A camera with no recorded probe shows as unknown &mdash; never a guessed uptime figure.</p>
+      </div>
+      <div class="page-actions">
+        <span id="data-badge" class="badge-note demo">Demo data</span>
+        <button id="refresh-btn" class="btn btn-ghost" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="stat-grid">
+      <div class="stat-card stat-good">
+        <div class="stat-label">Live</div>
+        <div class="stat-value" id="stat-live">&mdash;</div>
+      </div>
+      <div class="stat-card stat-bad">
+        <div class="stat-label">Faulty / unreachable</div>
+        <div class="stat-value" id="stat-faulty">&mdash;</div>
+      </div>
+      <div class="stat-card stat-warn">
+        <div class="stat-label">Never checked</div>
+        <div class="stat-value" id="stat-unknown">&mdash;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total cameras</div>
+        <div class="stat-value" id="stat-total">&mdash;</div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h2>All cameras</h2>
+      <p class="panel-sub">Search by name, code or district; filter by status.</p>
+
+      <div class="field" style="max-width:320px;">
+        <label for="ch-search">Search</label>
+        <input id="ch-search" type="search" placeholder="Name, code or district&hellip;" autocomplete="off">
+      </div>
+      <div class="filter-row" id="ch-filters" role="group" aria-label="Filter by status" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" data-filter="all" type="button" aria-pressed="true">All</button>
+        <button class="btn btn-ghost" data-filter="live" type="button" aria-pressed="false">Live</button>
+        <button class="btn btn-ghost" data-filter="faulty" type="button" aria-pressed="false">Faulty</button>
+        <button class="btn btn-ghost" data-filter="unknown" type="button" aria-pressed="false">Never checked</button>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table" id="ch-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>District</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Last probe</th>
+              <th>Latency</th>
+              <th>Last checked</th>
+            </tr>
+          </thead>
+          <tbody id="ch-tbody"></tbody>
+        </table>
+      </div>
+      <div id="ch-empty" class="empty-state" hidden>No cameras match this filter.</div>
+    </div>
+  </main>
+
+  <script src="api.js"></script>
+  <script src="nav.js"></script>
+  <script src="camera-health.js"></script>
+</body>
+</html>

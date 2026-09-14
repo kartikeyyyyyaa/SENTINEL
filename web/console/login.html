@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sign in to Sentinel — Gujarat Police's CCTV command platform.">
+  <meta name="theme-color" content="#0b1626">
+  <title>Sign in — Sentinel</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="platform.css">
+  <link rel="stylesheet" href="login-page.css">
+</head>
+<body class="theme-light" data-theme-fixed="light">
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <div class="gov-topbar">
+    <div class="gov-topbar-inner">
+      <span class="gov-topbar-left">GUJARAT POLICE &middot; HOME DEPARTMENT</span>
+      <span class="gov-topbar-right"><span class="gov-stat">Operator access</span></span>
+    </div>
+  </div>
+
+  <div id="platform-nav" data-tricolor="true"></div>
+
+  <main id="main" class="login-page">
+    <div class="login-card">
+
+      <aside class="login-aside">
+        <img class="login-aside-logo" src="assets/gujarat-police-logo.svg" alt="Gujarat Police emblem">
+        <h1 class="login-aside-title">Sentinel Control Room</h1>
+        <p class="login-aside-sub">Sign in with your operator credentials to reach the live CCTV grid, alerts and
+          response tools for your jurisdiction.</p>
+        <ul class="login-aside-list">
+          <li>Scoped to your jurisdiction &amp; role</li>
+          <li>Every sign-in recorded in the audit trail</li>
+          <li>English &middot; ગુજરાતી &middot; हिंदी</li>
+        </ul>
+      </aside>
+
+      <div class="login-main">
+        <h2 class="login-main-title">Sign in</h2>
+        <p class="login-main-sub">Enter the credentials issued by your department administrator.</p>
+
+        <form id="login-form" novalidate>
+          <div class="field">
+            <label for="login-username">Username</label>
+            <input id="login-username" type="text" autocomplete="username" aria-describedby="login-username-err" required>
+            <div id="login-username-err" class="field-error" aria-live="polite"></div>
+          </div>
+          <div class="field">
+            <label for="login-password">Password</label>
+            <input id="login-password" type="password" autocomplete="current-password" aria-describedby="login-password-err" required>
+            <div id="login-password-err" class="field-error" aria-live="polite"></div>
+          </div>
+          <button id="login-submit" class="btn btn-primary login-submit" type="submit">Sign in</button>
+          <div id="login-error" class="field-error login-toplevel-error" aria-live="polite"></div>
+        </form>
+
+        <a id="login-demo" class="login-demo" href="index.html">Continue without signing in &mdash; demo data only &rarr;</a>
+        <p class="login-foot">Need an account or lost access? Contact your department administrator.</p>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="api.js"></script>
+  <script src="nav.js"></script>
+  <script src="login.js"></script>
+</body>
+</html>

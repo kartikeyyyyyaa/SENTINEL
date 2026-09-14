@@ -1,0 +1,16 @@
+/* incident-reports.css — styling specific to incident-reports.html. */
+
+.ir-weeks-label { font-size: 12px; color: var(--text-2); align-self: center; }
+.ir-weeks-select { background: var(--card); border: 1px solid var(--line-soft); color: var(--text-0);
+  border-radius: 8px; padding: 8px 12px; font-size: 13px; font-family: var(--font-body); }
+.ir-stat-text { font-size: 17px !important; line-height: 1.3; }
+
+.ir-bars { display: flex; flex-direction: column; gap: 10px; }
+.ir-bar-row { display: grid; grid-template-columns: 140px 1fr 46px; align-items: center; gap: 12px; font-size: 12.8px; }
+.ir-bar-name { color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ir-bar-track { display: block; background: var(--card); border: 1px solid var(--line-soft); border-radius: 6px; height: 10px; overflow: hidden; }
+.ir-bar-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--blue), var(--blue-bright)); border-radius: 6px; }
+.ir-bar-count { color: var(--text-0); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+
+.kind-pill { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--card-2); color: var(--text-1);
+  white-space: nowrap; }

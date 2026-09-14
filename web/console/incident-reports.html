@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sentinel Incident Reports — area-wise, week-by-week counts of alerts Sentinel itself has detected across the Gujarat CCTV grid.">
+  <meta name="theme-color" content="#0a0f1c">
+  <title>Incident Reports — Sentinel</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="platform.css">
+  <link rel="stylesheet" href="incident-reports.css">
+</head>
+<body class="theme-light">
+  <a href="#main" class="skip-link">Skip to content</a>
+  <div id="platform-nav"></div>
+
+  <main id="main" class="page-shell">
+    <div class="page-header">
+      <div>
+        <h1>Incident Reports</h1>
+        <p>Area-wise, week-by-week counts of alerts this platform itself has opened &mdash; watchlist matches,
+          women&rsquo;s-safety flags, SOS calls and more. This is Sentinel's own detection history, grouped for
+          review, not an official crime statistic.</p>
+      </div>
+      <div class="page-actions">
+        <span id="data-badge" class="badge-note demo">Demo data</span>
+        <label class="ir-weeks-label" for="ir-weeks">Window</label>
+        <select id="ir-weeks" class="ir-weeks-select">
+          <option value="4">4 weeks</option>
+          <option value="8" selected>8 weeks</option>
+          <option value="12">12 weeks</option>
+          <option value="26">26 weeks</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total incidents</div>
+        <div class="stat-value" id="stat-total">&mdash;</div>
+      </div>
+      <div class="stat-card stat-bad">
+        <div class="stat-label">Critical / urgent</div>
+        <div class="stat-value" id="stat-severe">&mdash;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Districts reporting</div>
+        <div class="stat-value" id="stat-districts">&mdash;</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Busiest district</div>
+        <div class="stat-value ir-stat-text" id="stat-top-district">&mdash;</div>
+      </div>
+    </div>
+
+    <div class="panel-card">
+      <h2>By district</h2>
+      <p class="panel-sub">Total incidents in the selected window, highest first.</p>
+      <div id="ir-district-bars" class="ir-bars"></div>
+      <div id="ir-district-empty" class="empty-state" hidden>No incidents recorded in this window.</div>
+    </div>
+
+    <div class="panel-card">
+      <h2>All weeks</h2>
+      <p class="panel-sub">Every district / week / alert-kind row behind the totals above.</p>
+
+      <div class="field" style="max-width:320px;">
+        <label for="ir-search">Filter by district</label>
+        <input id="ir-search" type="search" placeholder="District name&hellip;" autocomplete="off">
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table" id="ir-table">
+          <thead>
+            <tr>
+              <th>Week of</th>
+              <th>District</th>
+              <th>Kind</th>
+              <th>Severity</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody id="ir-tbody"></tbody>
+        </table>
+      </div>
+      <div id="ir-empty" class="empty-state" hidden>No rows match this filter.</div>
+    </div>
+  </main>
+
+  <script src="api.js"></script>
+  <script src="nav.js"></script>
+  <script src="incident-reports.js"></script>
+</body>
+</html>

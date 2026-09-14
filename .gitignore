@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+node_modules/
+venv/
+.venv/
+.env
+*.pt
+*.mp4
+*.npz
+route_out/
+Claude outputs/
+.DS_Store

@@ -1,0 +1,29 @@
+/* safety-map.css — styling specific to safety-map.html. */
+
+.safety-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+.safety-map-panel { margin-bottom: 0; }
+.safety-map-canvas { height: 520px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line-soft); }
+.safety-side { display: flex; flex-direction: column; }
+
+.safety-legend { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--text-2); flex-wrap: wrap; }
+.safety-legend .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+.dot-low { background: var(--text-1); }
+.dot-medium { background: var(--amber); }
+.dot-high { background: var(--sev-urgent); }
+.dot-critical { background: var(--red); }
+
+.zone-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; }
+.zone-item { border: 1px solid var(--line-soft); border-radius: 8px; padding: 10px 12px; background: var(--bg-2); }
+.zone-item-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.zone-item-name { font-size: 13px; font-weight: 600; color: var(--text-0); }
+.zone-item-sub { font-size: 11.5px; color: var(--text-2); }
+.zone-item-note { font-size: 12px; color: var(--text-1); margin-top: 6px; line-height: 1.4; }
+.zone-item-actions { margin-top: 8px; }
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-row > div { margin-bottom: 0; }
+
+@media (max-width: 900px) {
+  .safety-layout { grid-template-columns: 1fr; }
+  .safety-map-canvas { height: 380px; }
+}

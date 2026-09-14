@@ -1,0 +1,39 @@
+/* login-page.css — login.html only. Light theme, two-column card mirroring the
+ * official site's register layout: navy identity panel left, white form right.
+ * The gov-topbar rule lives in landing.css; this page reuses those class names,
+ * so the small duplicate below keeps login.html independent of landing.css. */
+
+.gov-topbar { background: #0b1626; color: #cdd8ea; font-size: 12px; }
+.gov-topbar-inner { max-width: 1280px; margin: 0 auto; padding: 7px 24px; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.gov-topbar-left { letter-spacing: 0.08em; font-weight: 600; }
+.gov-stat { background: #16233a; border: 1px solid #22314e; border-radius: 6px; padding: 3px 9px; font-size: 11px; }
+
+.login-page { min-height: calc(100vh - 120px); display: flex; align-items: center; justify-content: center;
+  padding: 44px 20px; background: #f7f9fc; }
+.login-card { width: 100%; max-width: 860px; display: grid; grid-template-columns: 1fr 1fr;
+  background: #fff; border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(19,41,74,0.12); }
+
+.login-aside { background: linear-gradient(150deg, #0b2138, #123a63); color: #fff; padding: 40px 34px; }
+.login-aside-logo { width: 60px; height: 60px; display: block; margin-bottom: 20px; }
+.login-aside-title { font-family: var(--font-display); font-size: 24px; font-weight: 700; margin: 0 0 12px; }
+.login-aside-sub { font-size: 13.5px; line-height: 1.6; color: #cfdcec; margin: 0 0 22px; }
+.login-aside-list { list-style: none; margin: 0; padding: 0; }
+.login-aside-list li { position: relative; padding-left: 24px; margin-bottom: 12px; font-size: 13px; color: #e7eefb; }
+.login-aside-list li::before { content: ""; position: absolute; left: 0; top: 6px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 3px rgba(242,101,34,0.22); }
+
+.login-main { padding: 40px 36px; }
+.login-main-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text-0); margin: 0 0 6px; }
+.login-main-sub { font-size: 13px; color: var(--text-2); margin: 0 0 24px; }
+.login-submit { width: 100%; justify-content: center; font-size: 14.5px; padding: 12px; margin-top: 4px; }
+.login-toplevel-error { text-align: center; margin-top: 12px; }
+.login-demo { display: block; margin-top: 20px; font-size: 12.5px; color: var(--text-2); text-decoration: none; }
+.login-demo:hover { color: var(--orange); }
+.login-foot { margin: 16px 0 0; font-size: 11.5px; color: var(--text-2); line-height: 1.55; }
+
+@media (max-width: 720px) {
+  .login-card { grid-template-columns: 1fr; max-width: 440px; }
+  .login-aside { padding: 30px 28px; }
+}

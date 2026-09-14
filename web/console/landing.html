@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sentinel — Gujarat Police's live CCTV command platform: camera-health monitoring, area-wise incident reporting, a curated women's-safety map, and automatic incident routing to the nearest responder.">
+  <meta name="theme-color" content="#0b1626">
+  <title>Sentinel — Gujarat Police</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="platform.css">
+  <link rel="stylesheet" href="landing.css">
+</head>
+<body class="theme-light" data-theme-fixed="light">
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <!-- slim dark utility bar — echoes the official site's top strip, with an
+       honest platform status line instead of a registration countdown -->
+  <div class="gov-topbar">
+    <div class="gov-topbar-inner">
+      <span class="gov-topbar-left">GUJARAT POLICE &middot; HOME DEPARTMENT</span>
+      <span class="gov-topbar-right">
+        <span class="gov-stat"><b>30</b> cameras</span>
+        <span class="gov-stat"><b>10</b> districts</span>
+        <span class="gov-stat gov-stat-live"><span class="gov-dot"></span> live grid</span>
+      </span>
+    </div>
+  </div>
+
+  <div id="platform-nav" data-tricolor="true"></div>
+
+  <main id="main">
+
+    <section class="hero">
+      <div class="hero-inner">
+        <span class="hero-kicker">Gujarat Police &middot; CCTV Command Platform</span>
+        <h1 class="hero-title">One console for every camera,<br>every alert, every response.</h1>
+        <p class="hero-sub">Sentinel unifies the state CCTV grid, watchlist alerts and vehicle tracking into a
+          single control room — with live camera-health monitoring, area-wise incident reporting, a curated
+          women&rsquo;s-safety map, and automatic routing of a recognised incident to the nearest responder.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-lg" href="login.html">Sign in to the console</a>
+          <a class="btn btn-hero-ghost btn-lg" href="index.html">View live demo &rarr;</a>
+        </div>
+        <p class="hero-note">The demo runs on the real 30-camera Gujarat grid with synthetic alert data — no
+          sign-in required to look around.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="page-shell">
+        <span class="eyebrow">Capabilities</span>
+        <h2 class="section-title">What Sentinel gives a control room</h2>
+        <div class="feature-grid">
+
+          <a class="feature-card" href="index.html">
+            <span class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </span>
+            <h3>Live Ops</h3>
+            <p>Every camera on a live map, real-time alerts, and cross-camera vehicle-plate tracking with a
+              searchable watchlist — the operator&rsquo;s main screen.</p>
+          </a>
+
+          <a class="feature-card" href="camera-health.html">
+            <span class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2 5 4-12 2 7h6"/></svg>
+            </span>
+            <h3>Camera Health</h3>
+            <p>Which cameras are live, faulty or unreachable right now, with the last time each was actually
+              checked — never a guessed uptime number.</p>
+          </a>
+
+          <a class="feature-card" href="incident-reports.html">
+            <span class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="12" y="6" width="3" height="11"/><rect x="17" y="13" width="3" height="4"/></svg>
+            </span>
+            <h3>Incident Reports</h3>
+            <p>Area-wise, week-by-week counts of what Sentinel itself has detected — watchlist hits,
+              women&rsquo;s-safety flags, SOS calls — grouped by district for planning and review.</p>
+          </a>
+
+          <a class="feature-card" href="safety-map.html">
+            <span class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z"/></svg>
+            </span>
+            <h3>Women&rsquo;s Safety Map</h3>
+            <p>A curated overlay of areas flagged by police judgement — not an algorithm — so patrol planning
+              and the public-safety view share one honest picture.</p>
+          </a>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- The differentiator: automatic incident → nearest responder routing -->
+    <section class="section routing-band">
+      <div class="page-shell">
+        <span class="eyebrow eyebrow-on-navy">The differentiator</span>
+        <h2 class="section-title on-navy">Detect once. Route to the right responder, automatically.</h2>
+        <p class="routing-lead">When a camera recognises an incident, Sentinel doesn&rsquo;t just raise an alert on
+          a screen — it relays the location to the <b>nearest</b> responding unit first, then escalates to the
+          state control room. The type of incident decides who gets it.</p>
+        <div class="routing-grid">
+          <div class="routing-card">
+            <span class="routing-chip chip-police">Crime / women&rsquo;s safety</span>
+            <div class="routing-flow">Camera <span class="arr">&rarr;</span> nearest <b>PCR van</b> <span class="arr">&rarr;</span> control room</div>
+          </div>
+          <div class="routing-card">
+            <span class="routing-chip chip-medical">Accident detected</span>
+            <div class="routing-flow">Camera <span class="arr">&rarr;</span> nearest <b>hospital</b> <span class="arr">&rarr;</span> control room</div>
+          </div>
+          <div class="routing-card">
+            <span class="routing-chip chip-fire">Fire detected</span>
+            <div class="routing-flow">Camera <span class="arr">&rarr;</span> nearest <b>fire station</b> <span class="arr">&rarr;</span> control room</div>
+          </div>
+        </div>
+        <p class="routing-foot">Routing runs on demo responder locations today; on selection it connects to the
+          department&rsquo;s real PCR, hospital and fire-station rosters.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="page-shell">
+        <span class="eyebrow">Principles</span>
+        <h2 class="section-title">Built to be honest about its own data</h2>
+        <div class="honesty-grid">
+          <div class="honesty-item">
+            <h4>No invented crime statistics</h4>
+            <p>Incident Reports aggregate this platform&rsquo;s own alert history. Sentinel has no source of
+              official Gujarat crime data and does not fabricate one.</p>
+          </div>
+          <div class="honesty-item">
+            <h4>No invented uptime</h4>
+            <p>Camera Health shows the last real probe for every camera. A camera that has never been checked
+              says so — never a manufactured percentage.</p>
+          </div>
+          <div class="honesty-item">
+            <h4>Curated, not algorithmic, safety zones</h4>
+            <p>Women&rsquo;s-safety areas are entered and reviewed by police, labelled as curated judgement, and
+              never presented as measured crime data.</p>
+          </div>
+          <div class="honesty-item">
+            <h4>Scoped by jurisdiction, always</h4>
+            <p>Every read is scoped to what a signed-in officer&rsquo;s jurisdiction and role permit — enforced at
+              the database level, not just in the interface.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="page-shell site-footer-inner">
+      <span>&copy; Gujarat State Police &middot; Sentinel CCTV Command Platform</span>
+      <span class="site-footer-links">
+        <a href="index.html">Live Ops</a>
+        <a href="camera-health.html">Camera Health</a>
+        <a href="incident-reports.html">Incident Reports</a>
+        <a href="safety-map.html">Safety Map</a>
+      </span>
+    </div>
+  </footer>
+
+  <script src="nav.js"></script>
+</body>
+</html>
