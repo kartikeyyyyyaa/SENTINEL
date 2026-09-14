@@ -21,6 +21,8 @@ pgdata/
 *.log
 exports/
 evidence/
+.build-tmp
+Claude outputs
 
 # Editors / OS
 .vscode/
